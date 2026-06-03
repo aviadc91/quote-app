@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת הצעות מחיר</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ── SETUP SCREEN (shown if config.js not filled) ── -->
+  <div id="setup-screen" class="setup-screen hidden">
+    <div class="setup-card">
+      <div class="setup-logo">☁️</div>
+      <h1 class="setup-title">חיבור ל-Firebase</h1>
+      <p class="setup-subtitle">פעולה חד-פעמית — אחר כך הכל אוטומטי</p>
+
+      <div class="setup-steps">
+        <div class="setup-step">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-title">פתח <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></div>
+            <div class="step-desc">התחבר עם חשבון Google שלך</div>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-title">צור פרויקט חדש</div>
+            <div class="step-desc">שם כלשהו (לדוגמה: "quote-app") ← המשך ← המשך ← צור</div>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-title">הפעל Firestore</div>
+            <div class="step-desc">בתפריט שמאל: Build ← Firestore Database ← Create database ← Start in test mode ← המשך</div>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">4</div>
+          <div>
+            <div class="step-title">קבל את הגדרות הפרויקט</div>
+            <div class="step-desc">⚙️ Project settings ← General ← Your apps ← לחץ &lt;/&gt; ← Register app ← העתק את אובייקט <code>firebaseConfig</code></div>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">5</div>
+          <div>
+            <div class="step-title">פתח את קובץ <code>config.js</code> בנוטפד</div>
+            <div class="step-desc">החלף את כל ה-<code>REPLACE_ME</code> בערכים שהעתקת ← שמור</div>
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">6</div>
+          <div>
+            <div class="step-title">רענן את הדף</div>
+            <div class="step-desc">F5 — האפליקציה תתחבר ותיפתח</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SYNC STATUS BAR ── -->
+  <div id="sync-bar" class="sync-bar sync-ok hidden">
+    <span id="sync-dot" class="sync-dot">●</span>
+    <span id="sync-label">מחובר לענן</span>
+    <span class="sync-spacer"></span>
+    <button class="sync-btn" onclick="exportFullBackup()">💾 גיבוי מקומי</button>
+    <button class="sync-btn" onclick="triggerImportBackup()">📂 טען גיבוי</button>
+    <input type="file" id="import-backup-input" accept=".json" style="display:none" onchange="importFullBackup(event)">
+  </div>
+
+  <!-- ── MAIN APP ── -->
+  <div id="main-app" class="hidden">
+    <nav id="main-nav">
+      <div class="nav-brand"><span>📋</span> מערכת הצעות מחיר</div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-catalog" onclick="showScreen('catalog')">📦 מאגר פריטים</button>
+        <button class="nav-tab"        id="tab-quote"   onclick="showScreen('quote')">📄 בניית הצעה</button>
+      </div>
+    </nav>
+
+    <div id="screen-catalog" class="screen">
+      <div class="screen-header">
+        <div>
+          <h1>מאגר פריטים</h1>
+          <p class="screen-subtitle" id="catalog-count"></p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-primary" onclick="openCatalogNewItemModal()">+ הוסף פריט</button>
+          <button class="btn btn-excel"   onclick="exportCatalogToExcel()">📊 ייצא לאקסל</button>
+          <button class="btn btn-outline" onclick="triggerCatalogImport()">📥 ייבוא מאקסל</button>
+          <button class="btn btn-success" onclick="exportFullBackup()">💼 גיבוי מלא</button>
+        </div>
+      </div>
+      <div class="catalog-filters">
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="catalog-search" placeholder='חפש מק"ט, תיאור...' oninput="renderCatalogTable()">
+        </div>
+        <select id="catalog-cat-filter" class="cat-filter-select" onchange="setCatalogFilter(this.value)">
+          <option value="">כל הקטגוריות</option>
+        </select>
+      </div>
+      <div class="view-toggle">
+        <button id="cv-table"   class="vt-btn active" onclick="setCatalogView('table')">☰ טבלה</button>
+        <button id="cv-gallery" class="vt-btn"        onclick="setCatalogView('gallery')">🖼 גלריה</button>
+      </div>
+      <div id="catalog-table-container"></div>
+    </div>
+
+    <div id="screen-quote" class="screen hidden">
+      <div class="screen-header">
+        <div><h1>טיוטת הצעת מחיר</h1></div>
+        <div class="header-actions">
+          <button class="btn btn-outline" id="undo-btn" onclick="undo()"  disabled>↩ ביטול (0)</button>
+          <button class="btn btn-outline" id="redo-btn" onclick="redo()"  disabled>↪ בצע (0)</button>
+          <button class="btn btn-outline" onclick="saveQuoteToFile()">💾 שמור קובץ</button>
+          <button class="btn btn-outline" onclick="triggerLoadFromFile()">📂 טען קובץ</button>
+          <button class="btn btn-warning" onclick="clearQuote()">🗑 נקה הכל</button>
+          <button class="btn btn-pdf"     onclick="exportPDF()">📑 הפקת PDF</button>
+          <button class="btn btn-excel"   onclick="exportExcel()">📊 ייצוא לאקסל</button>
+        </div>
+      </div>
+      <div id="quote-container"></div>
+    </div>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="modal-title"></h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <input type="file" id="catalog-import-input" accept=".xlsx,.xls" style="display:none" onchange="importCatalogFromExcel(event)">
+  <input type="file" id="quote-load-input"     accept=".json"      style="display:none" onchange="loadQuoteFromFile(event)">
+
+  <!-- Firebase SDK (v9 compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
