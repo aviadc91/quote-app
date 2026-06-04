@@ -633,30 +633,50 @@ function renderCatalogTable() {
     return;
   }
 
-  let thtml='<div class="data-table-wrap"><table class="data-table"><thead><tr>'
-    +'<th style="width:66px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th style="width:76px">פעולות</th>'
+  // Table — rows clickable on mobile, inline buttons on desktop
+  let thtml='<div class="data-table-wrap"><table class="data-table catalog-table"><thead><tr>'
+    +'<th style="width:62px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th class="desktop-only" style="width:76px">פעולות</th>'
     +'</tr></thead><tbody>';
   filtered.forEach(item=>{
-    const thumb=imgThumb(item.id,54)||'<span style="color:#cbd5e1;font-size:1.2rem">—</span>';
-    thtml+='<tr>'
+    const thumb=imgThumb(item.id,52)||'<span style="color:#cbd5e1;font-size:1.2rem">—</span>';
+    thtml+='<tr class="catalog-row" onclick="openItemDetailModal(\''+item.id+'\')" style="cursor:pointer">'
       +'<td style="text-align:center;vertical-align:middle;">'+thumb+'</td>'
       +'<td><span class="sku-badge">'+item.sku+'</span></td>'
       +'<td>'
         +'<div style="font-weight:600;font-size:.88rem">'+item.description+'</div>'
         +(item.catalogNote?'<div style="color:var(--text-muted);font-size:.78rem;margin-top:2px">'+item.catalogNote+'</div>':'')
-        +'<div class="mobile-price" style="color:#1e3a8a;font-size:.8rem;margin-top:2px;direction:ltr;display:inline-block">'+fmtPrice(item.listPrice)+'</div>'
-      +'</td>'
-      +'<td><span class="price-ltr">'+fmtPrice(item.listPrice)+'</span></td>'
-      +'<td style="vertical-align:top;padding-top:8px">'
+        +'<div class="mobile-price" style="color:#1e3a8a;font-size:.8rem;margin-top:3px;direction:ltr;display:inline-block">'+fmtPrice(item.listPrice)+'</div>'
+      +'<td class="desktop-only" style="vertical-align:middle" onclick="event.stopPropagation()">'
         +'<div style="display:flex;flex-direction:column;gap:4px;align-items:center">'
           +'<button class="btn btn-outline" onclick="openCatalogEditItemModal(\''+item.id+'\')" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center">✏️</button>'
-          +'<button class="btn btn-danger" onclick="deleteCatalogItem(\''+item.id+'\')" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center">🗑</button>'
+          +'<button class="btn btn-danger"  onclick="deleteCatalogItem(\''+item.id+'\')"       style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center">🗑</button>'
         +'</div>'
       +'</td>'
     +'</tr>';
   });
   thtml+='</tbody></table></div>';
   container.innerHTML=thtml;
+}
+
+// ── Shared item detail modal (table + gallery) ───────────────
+function openItemDetailModal(id) {
+  const item = state.catalog.find(i=>i.id===id); if(!item) return;
+  const img  = loadItemImage(id);
+  openModal(item.description, `
+    ${img ? `<div style="width:100%;max-height:50vh;background:#f1f5f9;border-radius:var(--radius);overflow:hidden;margin-bottom:14px;display:flex;align-items:center;justify-content:center;">
+      <img src="${img}" style="max-width:100%;max-height:50vh;object-fit:contain;display:block;padding:8px">
+    </div>` : ''}
+    <div style="margin-bottom:14px">
+      <span class="sku-badge" style="font-size:.88rem">${esc(item.sku)}</span>
+      ${item.catalogNote?`<div style="font-size:.87rem;color:var(--text-muted);margin-top:7px">${esc(item.catalogNote)}</div>`:''}
+      ${item.esvfSkus?`<div style="font-size:.82rem;color:#2563eb;margin-top:5px">ESVF: ${esc(item.esvfSkus)}</div>`:''}
+      <div style="font-size:1.1rem;font-weight:700;color:#1e3a8a;margin-top:8px;direction:ltr;text-align:right">${fmtPrice(item.listPrice)}</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal();requireCatalogAuth(()=>_openCatalogEditItemModal('${esc(id)}'))">✏️ עריכה</button>
+      <button class="btn btn-danger"  onclick="closeModal();deleteCatalogItem('${esc(id)}')">🗑 מחיקה</button>
+      <button class="btn btn-outline" onclick="closeModal()">סגור</button>
+    </div>`);
 }
 
 // ============================================================
@@ -667,25 +687,7 @@ function openCatalogEditItemModal(id){ requireCatalogAuth(()=>_openCatalogEditIt
 function deleteCatalogItem(id)       { requireCatalogAuth(()=>_deleteCatalogItem(id)); }
 function triggerCatalogImport()      { requireCatalogAuth(()=>document.getElementById('catalog-import-input').click()); }
 
-function openGalleryItemModal(id) {
-  const item = state.catalog.find(i=>i.id===id); if(!item) return;
-  const img  = loadItemImage(id);
-  openModal(item.description, `
-    <div style="width:100%;aspect-ratio:4/3;background:#f1f5f9;border-radius:var(--radius);overflow:hidden;margin-bottom:14px;display:flex;align-items:center;justify-content:center;">
-      ${img ? `<img src="${img}" style="max-width:100%;max-height:100%;object-fit:contain;padding:8px">` : '<span style="font-size:3rem;opacity:.2">🖼️</span>'}
-    </div>
-    <div style="margin-bottom:12px">
-      <span class="sku-badge">${esc(item.sku)}</span>
-      ${item.catalogNote?`<div style="font-size:.85rem;color:var(--text-muted);margin-top:6px">${esc(item.catalogNote)}</div>`:''}
-      ${item.esvfSkus?`<div style="font-size:.82rem;color:#2563eb;margin-top:4px">ESVF: ${esc(item.esvfSkus)}</div>`:''}
-      <div style="font-size:1rem;font-weight:700;color:#1e3a8a;margin-top:6px;direction:ltr;text-align:right">${fmtPrice(item.listPrice)}</div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-primary" onclick="closeModal();requireCatalogAuth(()=>_openCatalogEditItemModal('${esc(id)}'))">✏️ עריכה</button>
-      <button class="btn btn-danger"  onclick="closeModal();deleteCatalogItem('${esc(id)}')">🗑 מחיקה</button>
-      <button class="btn btn-outline" onclick="closeModal()">סגור</button>
-    </div>`);
-}
+function openGalleryItemModal(id) { openItemDetailModal(id); }
 
 function _openCatalogNewItemModal() {
   openModal('הוספת פריט חדש',`
