@@ -325,15 +325,116 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 ::-webkit-scrollbar-thumb{background:var(--border-dark);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
 
+/* ============================================================
+   RESPONSIVE — MOBILE FIRST
+   ============================================================ */
 @media(max-width:768px){
-  .screen{padding:16px}
-  .header-actions{gap:4px}
-  .btn{padding:7px 11px;font-size:.82rem}
-  .totals-row{flex-direction:column}
-  .totals-card{min-width:unset;width:100%}
-  .item-pricing-row{flex-direction:column}
-  .ipr-field,.ipr-field.wide,.ipr-field.narrow{width:100%;max-width:100%}
+
+  /* ── Layout ── */
+  .screen{ padding:12px }
+  .screen-header{ flex-direction:column; align-items:stretch; gap:10px }
+  .screen-header h1{ font-size:1.2rem }
+
+  /* ── Nav ── */
+  #main-nav{ height:auto; flex-wrap:wrap; padding:8px 14px; gap:8px }
+  .nav-brand{ font-size:.95rem }
+  .nav-tabs{ gap:4px }
+  .nav-tab{ padding:6px 12px; font-size:.8rem }
+
+  /* ── Header action buttons — scrollable row ── */
+  .header-actions{
+    display:flex; flex-wrap:nowrap; overflow-x:auto;
+    gap:6px; padding-bottom:4px; -webkit-overflow-scrolling:touch
+  }
+  .header-actions .btn{ flex-shrink:0; white-space:nowrap; font-size:.8rem; padding:8px 11px }
+
+  /* ── Catalog filters ── */
+  .catalog-filters{ flex-direction:column }
+  .search-bar{ max-width:100% }
+  .cat-filter-select{ width:100% }
+
+  /* ── Catalog table — card layout instead of table ── */
+  .data-table-wrap{ overflow:hidden }
+  .data-table thead{ display:none }
+  .data-table tbody tr{
+    display:flex; flex-direction:column;
+    padding:12px; border-bottom:1px solid var(--border);
+    gap:6px; position:relative
+  }
+  .data-table tbody tr td{ 
+    border:none; padding:0; font-size:.88rem 
+  }
+  /* Show delete button prominently on mobile */
+  .data-table tbody tr td:last-child{
+    display:flex; gap:6px; margin-top:4px
+  }
+  .data-table tbody tr td:last-child .btn{
+    flex:1; justify-content:center; padding:10px; font-size:.85rem;
+    min-height:44px
+  }
+
+  /* ── Gallery — 3 per row on mobile ── */
+  .catalog-gallery{
+    grid-template-columns: repeat(3,1fr) !important;
+    gap:8px
+  }
+  .gallery-info{ padding:6px 8px }
+  .gallery-desc{ font-size:.72rem }
+  .gallery-price{ font-size:.78rem }
+
+  /* ── Item card pricing row — single column ── */
+  .item-pricing-row{
+    grid-template-columns:1fr 1fr !important;
+    gap:8px
+  }
+  .ipr-field.wide{ grid-column:span 2 }
+  .ipr-field.narrow{ grid-column:span 1 }
+  .ipr-field{ width:100%; max-width:100% }
+
+  /* ── Notes row — stack ── */
+  .item-notes-row{ grid-template-columns:1fr }
+
+  /* ── Group header ── */
+  .group-header{ flex-wrap:wrap; gap:6px; padding:10px 12px }
+  .group-actions{ flex-wrap:wrap; gap:4px }
+  .group-actions .btn{ padding:6px 10px; font-size:.78rem }
+
+  /* ── Totals ── */
+  .totals-row{ flex-direction:column }
+  .totals-card{ min-width:unset; width:100% }
+  .notes-card{ min-width:unset; width:100% }
+
+  /* ── Modal — full screen ── */
+  .modal-overlay{ padding:0; align-items:flex-end }
+  .modal{
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    max-height:92vh; max-width:100%; width:100%
+  }
+
+  /* ── Quote info card ── */
+  .quote-info-card{ flex-direction:column; gap:10px }
+  .qi-field{ min-width:unset; width:100% }
+
+  /* ── Sync bar ── */
+  .sync-bar{ padding:6px 12px; gap:7px }
+  .sync-btn{ padding:5px 10px }
+
+  /* ── Touch targets — min 44px ── */
+  .btn, .nav-tab, .sync-btn, .vt-btn{
+    min-height:40px; display:inline-flex; align-items:center; justify-content:center
+  }
+
+  /* ── Picker ── */
+  .group-picker-grid{ grid-template-columns:repeat(2,1fr) }
 }
+
+@media(max-width:380px){
+  /* Very small screens */
+  .catalog-gallery{ grid-template-columns:repeat(2,1fr) !important }
+  .item-pricing-row{ grid-template-columns:1fr !important }
+  .ipr-field.wide{ grid-column:span 1 }
+}
+
 
 /* === AUTOSAVE BAR (always visible) === */
 .autosave-bar{
