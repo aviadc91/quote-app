@@ -353,43 +353,25 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
   .search-bar{ max-width:100% }
   .cat-filter-select{ width:100% }
 
-  /* ── Catalog TABLE — card layout ── */
-  .data-table-wrap{ overflow:hidden; border-radius:var(--radius-lg) }
-  .data-table thead{ display:none }
-  .data-table, .data-table tbody, .data-table tr, .data-table td{ display:block; width:100% }
-  .data-table tbody tr{
-    display:flex; flex-direction:row; align-items:flex-start;
+  /* ── Catalog table: hide desktop columns on mobile ── */
+
+  /* catalog table rows layout */
+  .catalog-table thead{ display:none }
+  .catalog-table tbody tr{
+    display:flex; flex-direction:row; align-items:center;
     padding:9px 10px; border-bottom:1px solid var(--border); gap:10px
   }
-  .data-table tbody tr td{ border:none; padding:0 }
+  .catalog-table tbody tr td{ border:none; padding:0 }
 
-  /* thumb cell */
-  .data-table tbody tr td:nth-child(1){
-    width:54px; flex-shrink:0
-  }
-  .data-table tbody tr td:nth-child(1) img{
-    width:54px!important; height:54px!important
-  }
+  /* thumb */
+  .catalog-table tbody tr td:nth-child(1){ width:52px; flex-shrink:0 }
+  .catalog-table tbody tr td:nth-child(1) img{ width:52px!important; height:52px!important }
 
-  /* sku cell — hide on mobile (shown in body cell) */
-  .data-table tbody tr td:nth-child(2){ display:none }
+  /* sku */
+  .catalog-table tbody tr td:nth-child(2){ flex-shrink:0 }
 
-  /* description cell — takes remaining space */
-  .data-table tbody tr td:nth-child(3){ flex:1; min-width:0 }
-
-  /* price cell — hide, shown in description cell */
-  .data-table tbody tr td:nth-child(4){ display:none }
-
-  /* actions cell — icon buttons stacked */
-  .data-table tbody tr td:nth-child(5){
-    display:flex; flex-direction:column; gap:4px;
-    flex-shrink:0; width:34px
-  }
-  .data-table tbody tr td:nth-child(5) .btn{
-    width:32px; height:32px; padding:0;
-    display:flex; align-items:center; justify-content:center;
-    font-size:.85rem; min-height:unset
-  }
+  /* description — takes remaining space */
+  .catalog-table tbody tr td:nth-child(3){ flex:1; min-width:0 }
 
   /* ── Gallery — 3 per row ── */
   .catalog-gallery{
