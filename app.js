@@ -527,7 +527,8 @@ function addSkuToHierarchy(gid,sgid,sku){ const h=CATALOG_HIERARCHY.find(h=>h.id
 //  QUOTE MANAGEMENT
 // ============================================================
 function createNewQuote(silent) {
-  state.quote={id:Date.now(),createdAt:new Date().toISOString(),projectName:'',employeeName:'',groups:[],globalDiscountPct:0,discountReason:'',notes:''};
+  const defaultGroup={id:'default',name:'',collapsed:false,items:[]};
+  state.quote={id:Date.now(),createdAt:new Date().toISOString(),projectName:'',employeeName:'',groups:[defaultGroup],globalDiscountPct:0,discountReason:'',notes:''};
   saveQuote(); if(!silent){renderQuote(); showToast('הצעה חדשה נוצרה','success');}
 }
 function normalizeQuote(q) {
@@ -535,7 +536,8 @@ function normalizeQuote(q) {
   ['projectName','employeeName','notes'].forEach(k=>{if(!(k in q))q[k]='';});
   if(!('globalDiscountPct' in q))q.globalDiscountPct=0;
   if(!('discountReason' in q))q.discountReason='';
-  if(q.groups)q.groups.forEach(g=>{g.items=g.items.map(migrateItem);});
+  if(!q.groups||!q.groups.length) q.groups=[{id:'default',name:'',collapsed:false,items:[]}];
+  q.groups.forEach(g=>{g.items=g.items.map(migrateItem);});
 }
 function migrateItem(item) {
   if(item.installations&&Array.isArray(item.installations)){const f=item.installations[0]||{}; return {id:item.id||uid(),sku:item.sku||'',description:item.description||'',note:item.note||'',internalNote:item.internalNote||'',installInfo:[f.installNum,f.roomName].filter(Boolean).join(' / '),qty:f.qty||1,listPrice:f.listPrice||0,manualPrice:f.manualPrice||'',discountPct:f.discountPct||0,extras:[]};}
@@ -587,17 +589,6 @@ function loadQuoteFromFile(event){
 // ============================================================
 //  FULL BACKUP EXPORT
 // ============================================================
-function exportFullBackup() {
-  const images={};
-  state.catalog.forEach(i=>{ if(imageCache[i.id])images[i.id]=imageCache[i.id]; });
-  const payload={version:2,exportedAt:new Date().toISOString(),catalog:state.catalog,quote:state.quote,images};
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=Object.assign(document.createElement('a'),{href:url,download:`גיבוי_מלא_${todayStr().replace(/\//g,'-')}.json`});
-  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-  showToast(`✅ גיבוי: ${state.catalog.length} פריטים, ${Object.keys(images).length} תמונות`,'success');
-}
-
 // ============================================================
 //  CATALOG VIEW STATE
 // ============================================================
@@ -964,15 +955,30 @@ function groupBodyDrop(e,gid){e.preventDefault();document.getElementById('gbody-
 function showScreen(s){['catalog','quote'].forEach(n=>{document.getElementById('screen-'+n)?.classList.toggle('hidden',n!==s);document.getElementById('tab-'+n)?.classList.toggle('active',n===s);});}
 
 function renderQuote(){
-  const container=document.getElementById('quote-container');if(!state.quote){container.innerHTML='<div class="empty-state"><div class="es-icon">📄</div><div class="es-title">אין הצעה פעילה</div><button class="btn btn-primary" onclick="createNewQuote()">צור הצעה חדשה</button></div>';return;}
+  const container=document.getElementById('quote-container');
+  if(!state.quote){container.innerHTML='<div class="empty-state"><div class="es-icon">📄</div><div class="es-title">אין הצעה פעילה</div><button class="btn btn-primary" onclick="createNewQuote()">צור הצעה חדשה</button></div>';return;}
+
+  const hasNamedGroups = state.quote.groups.some(g=>g.name!=='');
+  const defaultGrp     = state.quote.groups.find(g=>g.id==='default') || state.quote.groups[0];
+
   container.innerHTML=`
     <div class="quote-info-card">
       <div class="qi-field"><label>📋 שם הפרויקט</label><input type="text" value="${esc(state.quote.projectName||'')}" placeholder="הכנס שם פרויקט..." oninput="onProjectNameInput(this.value)"></div>
       <div class="qi-field"><label>👤 שם העובד המכין</label><input type="text" value="${esc(state.quote.employeeName||'')}" placeholder="שם מלא..." oninput="onEmployeeNameInput(this.value)"></div>
       <div class="qi-date">📅 ${todayStr()}</div>
     </div>
-    ${state.quote.groups.length===0?'<div class="empty-state" style="padding:40px"><div class="es-icon">📋</div><div class="es-title">ההצעה ריקה</div><div class="es-sub">לחץ על "הוסף קבוצה" כדי להתחיל</div></div>':state.quote.groups.map(renderGroupHTML).join('')}
-    <button class="add-group-btn" onclick="addGroup()">+ הוסף קבוצה חדשה</button>
+
+    ${hasNamedGroups
+      ? state.quote.groups.map(renderGroupHTML).join('')
+      : renderUngroupedHTML(defaultGrp)
+    }
+
+    ${hasNamedGroups
+      ? `<button class="add-group-btn" onclick="addGroup()">+ הוסף קבוצה חדשה</button>`
+      : `<button class="add-group-btn" onclick="openItemPickerModal('${defaultGrp.id}')">+ הוסף סעיף</button>
+         <button class="split-groups-btn" onclick="openSplitModal()">⚡ פצל סעיפים לקבוצות...</button>`
+    }
+
     <div class="totals-row">
       <div class="totals-card">
         <h3>📊 סיכום הצעה</h3>
@@ -989,7 +995,46 @@ function renderQuote(){
   updateUndoRedoBtn();
 }
 
+function renderUngroupedHTML(group) {
+  if (!group) return '';
+  const items = group.items;
+  if (!items.length) return `
+    <div class="empty-state" style="padding:40px">
+      <div class="es-icon">📋</div>
+      <div class="es-title">ההצעה ריקה</div>
+      <div class="es-sub">לחץ "הוסף סעיף" כדי להתחיל</div>
+    </div>`;
+  return `
+    <div class="ungrouped-list" id="gbody-${group.id}"
+      ondragover="groupBodyDragOver(event,'${group.id}')"
+      ondragleave="groupBodyDragLeave(event)"
+      ondrop="groupBodyDrop(event,'${group.id}')">
+      ${items.map(item=>renderItemHTML(group.id,item)).join('')}
+      <div class="ungrouped-footer">
+        <span style="color:var(--text-muted)">סה"כ:</span>
+        <span class="group-footer-total" id="gt-${group.id}">${fmtPrice(calcGroupTotal(group))}</span>
+      </div>
+    </div>`;
+}
+
 function renderGroupHTML(group){
+  const isDefault = group.id==='default' || group.name==='';
+  if (isDefault) {
+    // Unnamed default group rendered inline (no header) alongside named groups
+    return group.items.length===0 ? '' : `
+      <div class="group-card" id="gc-${group.id}">
+        <div class="group-header" style="background:#64748b">
+          <span class="group-title">ללא קבוצה</span>
+          <div class="group-actions">
+            <button class="btn btn-ghost btn-sm" onclick="openItemPickerModal('${group.id}')">+ סעיף</button>
+          </div>
+        </div>
+        <div class="group-body" id="gbody-${group.id}" ondragover="groupBodyDragOver(event,'${group.id}')" ondragleave="groupBodyDragLeave(event)" ondrop="groupBodyDrop(event,'${group.id}')">
+          ${group.items.map(item=>renderItemHTML(group.id,item)).join('')}
+        </div>
+        <div class="group-footer"><span style="color:var(--text-muted)">סה"כ קבוצה:</span><span class="group-footer-total" id="gt-${group.id}">${fmtPrice(calcGroupTotal(group))}</span></div>
+      </div>`;
+  }
   return `<div class="group-card" id="gc-${group.id}">
     <div class="group-header">
       <button class="group-toggle-btn" id="gtoggle-${group.id}" onclick="toggleGroup('${group.id}')">${group.collapsed?'▶':'▼'}</button>
@@ -997,14 +1042,57 @@ function renderGroupHTML(group){
       <div class="group-actions">
         <button class="btn btn-ghost btn-sm" onclick="renameGroup('${group.id}')">✏️ שם</button>
         <button class="btn btn-ghost btn-sm" onclick="openItemPickerModal('${group.id}')">+ סעיף</button>
-        <button class="btn btn-sm" style="background:rgba(220,38,38,.75);color:white" onclick="deleteGroup('${group.id}')">🗑 מחק</button>
+        <button class="btn btn-sm" style="background:rgba(220,38,38,.75);color:white" onclick="deleteGroup('${group.id}')">🗑</button>
       </div>
     </div>
     <div class="group-body ${group.collapsed?'collapsed':''}" id="gbody-${group.id}" ondragover="groupBodyDragOver(event,'${group.id}')" ondragleave="groupBodyDragLeave(event)" ondrop="groupBodyDrop(event,'${group.id}')">
-      ${group.items.length===0?'<div class="group-empty">אין סעיפים. לחץ "+ סעיף" כדי להוסיף.</div>':group.items.map(item=>renderItemHTML(group.id,item)).join('')}
+      ${group.items.length===0?'<div class="group-empty">אין סעיפים.</div>':group.items.map(item=>renderItemHTML(group.id,item)).join('')}
     </div>
     <div class="group-footer"><span style="color:var(--text-muted)">סה"כ קבוצה:</span><span class="group-footer-total" id="gt-${group.id}">${fmtPrice(calcGroupTotal(group))}</span></div>
   </div>`;
+}
+
+// ── Split into groups ────────────────────────────────────────
+function openSplitModal() {
+  const defaultGrp = state.quote.groups.find(g=>g.id==='default')||state.quote.groups[0];
+  if (!defaultGrp||!defaultGrp.items.length) return showToast('אין סעיפים לפיצול','warning');
+  const rows = defaultGrp.items.map(item=>`
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border);cursor:pointer">
+      <input type="checkbox" value="${esc(item.id)}" checked style="margin-top:2px;flex-shrink:0;accent-color:#1e3a8a">
+      <div>
+        <div style="font-weight:600;font-size:.88rem">${esc(item.description)}</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">${esc(item.sku)}${item.installInfo?' — '+esc(item.installInfo):''}</div>
+      </div>
+    </label>`).join('');
+  openModal('⚡ פיצול לקבוצות',`
+    <p style="font-size:.88rem;color:var(--text-muted);margin-bottom:12px">סמן את הסעיפים שיועברו לקבוצה חדשה. הנותרים ישארו ללא קבוצה.</p>
+    <div style="max-height:320px;overflow-y:auto">${rows}</div>
+    <div class="form-group" style="margin-top:14px">
+      <label>שם הקבוצה החדשה</label>
+      <input type="text" id="split-group-name" placeholder="קומה א, מגדל מזרחי...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="confirmSplit()">צור קבוצה</button>
+      <button class="btn btn-outline" onclick="closeModal()">ביטול</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('split-group-name')?.focus(),60);
+}
+
+function confirmSplit() {
+  const name = (document.getElementById('split-group-name')?.value||'').trim();
+  if (!name) return showToast('נדרש שם קבוצה','error');
+  const checked = [...document.querySelectorAll('#modal-body input[type=checkbox]:checked')].map(el=>el.value);
+  if (!checked.length) return showToast('לא נבחרו סעיפים','warning');
+
+  const defaultGrp = state.quote.groups.find(g=>g.id==='default')||state.quote.groups[0];
+  const toMove = defaultGrp.items.filter(i=>checked.includes(i.id));
+  defaultGrp.items = defaultGrp.items.filter(i=>!checked.includes(i.id));
+
+  const newGroup = {id:uid(), name, collapsed:false, items:toMove};
+  state.quote.groups.push(newGroup);
+
+  saveQuote(); closeModal(); renderQuote();
+  showToast(`✅ קבוצה "${name}" נוצרה עם ${toMove.length} סעיפים`,'success');
 }
 
 function renderItemHTML(gid,item){
@@ -1304,3 +1392,15 @@ document.addEventListener('paste', e => {
 //  BOOT
 // ============================================================
 window.addEventListener('DOMContentLoaded', boot);
+
+// נקה localStorage בסגירת הדפדפן אם Firebase מחובר — אין צורך בנתונים מקומיים
+window.addEventListener('unload', () => {
+  if (db) {
+    try {
+      const keys = Object.keys(localStorage).filter(k =>
+        k.startsWith('pq_catalog') || k.startsWith('pq_quote') || k.startsWith('pq_img_')
+      );
+      keys.forEach(k => localStorage.removeItem(k));
+    } catch(e) {}
+  }
+});
