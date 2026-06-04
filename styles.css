@@ -649,3 +649,16 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
     font-size:.78rem; padding:7px 10px
   }
 }
+
+/* === CATALOG TABLE — mobile row tap === */
+.catalog-row:hover td { background: #f0f7ff }
+.catalog-row:active td { background: #dbeafe }
+
+@media(max-width:768px){
+  .desktop-only { display: none !important }
+  /* Show price inside description cell on mobile */
+  .catalog-table td:nth-child(4) { display: none }
+}
+@media(min-width:769px){
+  .mobile-price { display: none }
+}
