@@ -617,18 +617,14 @@ function renderCatalogTable() {
   if(catalogView==='gallery'){
     const wi=filtered.filter(i=>loadItemImage(i.id));
     if(!wi.length){container.innerHTML='<div class="empty-state"><div class="es-icon">🖼️</div><div class="es-title">אין פריטים עם תמונות</div></div>';return;}
-    let ghtml='<div class="catalog-gallery" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">';
+    let ghtml='<div class="catalog-gallery">';
     wi.forEach(item=>{
       const img=loadItemImage(item.id);
-      ghtml+='<div class="gallery-card">'
-        +'<div class="gallery-img-wrap" onclick="openCatalogEditItemModal(\''+item.id+'\')"><img src="'+img+'"></div>'
+      ghtml+='<div class="gallery-card" onclick="openGalleryItemModal(\''+item.id+'\')">'
+        +'<div class="gallery-img-wrap"><img src="'+img+'" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
         +'<div class="gallery-info">'
-          +'<span class="sku-badge" style="font-size:.7rem">'+item.sku+'</span>'
-          +'<div class="gallery-desc">'+item.description+'</div>'
-        +'</div>'
-        +'<div class="gallery-card-btns">'
-          +'<button class="gallery-card-btn del" onclick="deleteCatalogItem(\''+item.id+'\')">🗑</button>'
-          +'<button class="gallery-card-btn" onclick="openCatalogEditItemModal(\''+item.id+'\')">✏️</button>'
+          +'<span class="sku-badge" style="font-size:.68rem">'+item.sku+'</span>'
+          +'<div class="gallery-desc" style="font-size:.74rem;line-height:1.25;margin-top:2px">'+item.description+'</div>'
         +'</div>'
       +'</div>';
     });
@@ -636,6 +632,7 @@ function renderCatalogTable() {
     container.innerHTML=ghtml;
     return;
   }
+
   let thtml='<div class="data-table-wrap"><table class="data-table"><thead><tr>'
     +'<th style="width:66px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th style="width:76px">פעולות</th>'
     +'</tr></thead><tbody>';
@@ -669,6 +666,26 @@ function openCatalogNewItemModal()  { requireCatalogAuth(_openCatalogNewItemModa
 function openCatalogEditItemModal(id){ requireCatalogAuth(()=>_openCatalogEditItemModal(id)); }
 function deleteCatalogItem(id)       { requireCatalogAuth(()=>_deleteCatalogItem(id)); }
 function triggerCatalogImport()      { requireCatalogAuth(()=>document.getElementById('catalog-import-input').click()); }
+
+function openGalleryItemModal(id) {
+  const item = state.catalog.find(i=>i.id===id); if(!item) return;
+  const img  = loadItemImage(id);
+  openModal(item.description, `
+    <div style="width:100%;aspect-ratio:4/3;background:#f1f5f9;border-radius:var(--radius);overflow:hidden;margin-bottom:14px;display:flex;align-items:center;justify-content:center;">
+      ${img ? `<img src="${img}" style="max-width:100%;max-height:100%;object-fit:contain;padding:8px">` : '<span style="font-size:3rem;opacity:.2">🖼️</span>'}
+    </div>
+    <div style="margin-bottom:12px">
+      <span class="sku-badge">${esc(item.sku)}</span>
+      ${item.catalogNote?`<div style="font-size:.85rem;color:var(--text-muted);margin-top:6px">${esc(item.catalogNote)}</div>`:''}
+      ${item.esvfSkus?`<div style="font-size:.82rem;color:#2563eb;margin-top:4px">ESVF: ${esc(item.esvfSkus)}</div>`:''}
+      <div style="font-size:1rem;font-weight:700;color:#1e3a8a;margin-top:6px;direction:ltr;text-align:right">${fmtPrice(item.listPrice)}</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal();requireCatalogAuth(()=>_openCatalogEditItemModal('${esc(id)}'))">✏️ עריכה</button>
+      <button class="btn btn-danger"  onclick="closeModal();deleteCatalogItem('${esc(id)}')">🗑 מחיקה</button>
+      <button class="btn btn-outline" onclick="closeModal()">סגור</button>
+    </div>`);
+}
 
 function _openCatalogNewItemModal() {
   openModal('הוספת פריט חדש',`
