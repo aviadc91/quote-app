@@ -239,7 +239,8 @@ function _submitAuth() {
 //  FIREBASE STORAGE
 // ============================================================
 let db = null;
-let _syncTimer = null;
+let _catalogTimer = null;
+let _quoteTimer   = null;
 
 function _setSyncBar(status, msg) {
   const bar   = document.getElementById('sync-bar');
@@ -255,8 +256,8 @@ function _setSyncBar(status, msg) {
 function saveCatalog() {
   try { localStorage.setItem('pq_catalog', JSON.stringify(state.catalog)); } catch(e){}
   if (!db) return;
-  clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(async ()=>{
+  clearTimeout(_catalogTimer);
+  _catalogTimer = setTimeout(async ()=>{
     _setSyncBar('saving','שומר...');
     try {
       await db.collection('data').doc('catalog').set({
@@ -271,16 +272,32 @@ function saveQuote() {
   if (!state.quote) return;
   try { localStorage.setItem('pq_quote', JSON.stringify(state.quote)); } catch(e){}
   if (!db) return;
-  clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(async ()=>{
-    _setSyncBar('saving','שומר...');
+  clearTimeout(_quoteTimer);
+  _quoteTimer = setTimeout(async ()=>{
     try {
       await db.collection('data').doc('quote').set({
         ...state.quote, updatedAt: new Date().toISOString()
       });
-      _setSyncBar('ok','מחובר לענן ✓');
-    } catch(e){ _setSyncBar('error','שגיאת שמירה'); console.error(e); }
+    } catch(e){ console.error(e); }
   }, 800);
+}
+
+// שמירה מיידית לענן (ללא debounce) — לשימוש בייבוא גיבוי
+async function forceSaveAll() {
+  if (!db) return;
+  _setSyncBar('saving','שומר לענן...');
+  try {
+    await db.collection('data').doc('catalog').set({
+      items: state.catalog, updatedAt: new Date().toISOString()
+    });
+    await db.collection('data').doc('quote').set({
+      ...state.quote, updatedAt: new Date().toISOString()
+    });
+    _setSyncBar('ok','נשמר בענן ✓');
+  } catch(e){
+    _setSyncBar('error','שגיאת שמירה');
+    console.error(e);
+  }
 }
 
 function saveItemImage(itemId, dataUrl) {
@@ -328,7 +345,7 @@ function importFullBackup(event) {
       if(data.quote){state.quote=data.quote;normalizeQuote(state.quote);}
       else createNewQuote(true);
       Object.entries(data.images||{}).forEach(([id,url])=>saveItemImage(id,url));
-      saveCatalog(); saveQuote();
+      await forceSaveAll();
       renderCatalogTable(); renderQuote();
       showToast(`✅ ${data.catalog.length} פריטים נטענו`,'success');
     } catch(ex){showToast('שגיאה: '+ex.message,'error');}
@@ -609,11 +626,20 @@ function renderCatalogTable() {
   if(catalogView==='gallery'){
     const wi=filtered.filter(i=>loadItemImage(i.id));
     if(!wi.length){container.innerHTML='<div class="empty-state"><div class="es-icon">🖼️</div><div class="es-title">אין פריטים עם תמונות</div><div class="es-sub">הוסף תמונות דרך ✏️ עריכה</div></div>';return;}
-    container.innerHTML='<div class="catalog-gallery">'+wi.map(item=>'<div class="gallery-card" onclick="openCatalogEditItemModal(\''+item.id+'\')"><div class="gallery-img-wrap"><img src="'+loadItemImage(item.id)+'"></div><div class="gallery-info"><span class="sku-badge" style="font-size:.72rem">'+item.sku+'</span><div class="gallery-desc">'+item.description+'</div>'+(item.catalogNote?'<div class="gallery-note">'+item.catalogNote+'</div>':'')+(item.esvfSkus?'<div class="gallery-esvf">ESVF: '+item.esvfSkus+'</div>':'')+'<div class="gallery-price">'+fmtPrice(item.listPrice)+'</div></div></div>').join('')+'</div>';
+    container.innerHTML='<div class="catalog-gallery" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">'+wi.map(item=>'<div class="gallery-card" onclick="openCatalogEditItemModal(\''+item.id+'\')"><div class="gallery-img-wrap"><img src="'+loadItemImage(item.id)+'"></div><div class="gallery-info"><span class="sku-badge" style="font-size:.72rem">'+item.sku+'</span><div class="gallery-desc">'+item.description+'</div>'+(item.catalogNote?'<div class="gallery-note">'+item.catalogNote+'</div>':'')+'<div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-outline btn-xs" style="flex:1" onclick="event.stopPropagation();openCatalogEditItemModal(\''+item.id+'\')">✏️</button><button class="btn btn-danger btn-xs" style="flex:1" onclick="event.stopPropagation();deleteCatalogItem(\''+item.id+'\')">🗑</button></div></div></div>').join('')+'</div>';
     return;
   }
-  container.innerHTML='<div class="data-table-wrap"><table class="data-table"><thead><tr><th style="width:70px">תמונה</th><th>מק"ט</th><th>תיאור והערה</th><th>ESVF</th><th>מחיר</th><th style="width:160px">פעולות</th></tr></thead><tbody>'+
-    filtered.map(item=>'<tr><td style="text-align:center;vertical-align:middle;">'+(imgThumb(item.id,56)||'<span style="color:#cbd5e1">—</span>')+'</td><td><span class="sku-badge">'+item.sku+'</span></td><td><div style="font-weight:600;font-size:.88rem">'+item.description+'</div>'+(item.catalogNote?'<div style="color:var(--text-muted);font-size:.78rem;margin-top:2px">'+item.catalogNote+'</div>':'')+'</td><td style="font-size:.8rem;color:#2563eb">'+(item.esvfSkus||'—')+'</td><td><span class="price-ltr">'+fmtPrice(item.listPrice)+'</span></td><td><button class="btn btn-outline btn-sm" onclick="openCatalogEditItemModal(\''+item.id+'\')">✏️ עריכה</button> <button class="btn btn-danger btn-sm" onclick="deleteCatalogItem(\''+item.id+'\')">מחק</button></td></tr>').join('')+
+  container.innerHTML='<div class="data-table-wrap"><table class="data-table"><thead><tr><th style="width:70px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th style="width:130px">פעולות</th></tr></thead><tbody>'+
+    filtered.map(item=>'<tr>'+
+      '<td style="text-align:center;vertical-align:middle;">'+(imgThumb(item.id,52)||'<span style="color:#cbd5e1">—</span>')+'</td>'+
+      '<td><span class="sku-badge">'+item.sku+'</span></td>'+
+      '<td><div style="font-weight:600;font-size:.88rem">'+item.description+'</div>'+(item.catalogNote?'<div style="color:var(--text-muted);font-size:.78rem;margin-top:2px">'+item.catalogNote+'</div>':'')+'</td>'+
+      '<td><span class="price-ltr">'+fmtPrice(item.listPrice)+'</span></td>'+
+      '<td>'+
+        '<button class="btn btn-outline btn-sm" onclick="openCatalogEditItemModal(\''+item.id+'\')" style="min-height:40px">✏️ עריכה</button> '+
+        '<button class="btn btn-danger btn-sm" onclick="deleteCatalogItem(\''+item.id+'\')" style="min-height:40px">🗑 מחק</button>'+
+      '</td>'+
+    '</tr>').join('')+
     '</tbody></table></div>';
 }
 
