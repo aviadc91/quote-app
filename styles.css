@@ -598,3 +598,54 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
   #screen-quote .header-actions .btn-pdf,
   #screen-quote .header-actions .btn-excel { grid-column: span 1 }
 }
+
+/* === GALLERY — 3 per row, full image === */
+.catalog-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 8px;
+}
+@media(min-width:769px){
+  .catalog-gallery { grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:14px; padding:4px 0 }
+}
+.gallery-img-wrap {
+  width:100%; aspect-ratio:1;
+  background:#f1f5f9;
+  display:flex; align-items:center; justify-content:center;
+  padding:6px; overflow:hidden
+}
+.gallery-img-wrap img {
+  width:100%; height:100%;
+  object-fit:contain !important;
+  display:block
+}
+.gallery-info { padding:4px 6px 6px }
+.gallery-card { cursor:pointer; border-radius:var(--radius); border:0.5px solid var(--border); overflow:hidden; background:white }
+.gallery-card:hover { box-shadow:var(--shadow-md) }
+
+/* === QUOTE BUTTONS: 4 per row on mobile === */
+@media(max-width:768px){
+  #screen-quote .header-actions {
+    display: grid !important;
+    grid-template-columns: repeat(4,1fr);
+    gap: 5px;
+    overflow: visible;
+  }
+  #screen-quote .header-actions .btn {
+    width:100%; justify-content:center;
+    font-size:.72rem; padding:8px 3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis
+  }
+}
+
+/* === CATALOG BUTTONS: wrap, no overflow === */
+@media(max-width:768px){
+  #screen-catalog .header-actions {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+  }
+  #screen-catalog .header-actions .btn {
+    font-size:.78rem; padding:7px 10px
+  }
+}
