@@ -625,22 +625,50 @@ function renderCatalogTable() {
   if(!filtered.length){container.innerHTML='<div class="empty-state"><div class="es-icon">📦</div><div class="es-title">לא נמצאו פריטים</div></div>';return;}
   if(catalogView==='gallery'){
     const wi=filtered.filter(i=>loadItemImage(i.id));
-    if(!wi.length){container.innerHTML='<div class="empty-state"><div class="es-icon">🖼️</div><div class="es-title">אין פריטים עם תמונות</div><div class="es-sub">הוסף תמונות דרך ✏️ עריכה</div></div>';return;}
-    container.innerHTML='<div class="catalog-gallery" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">'+wi.map(item=>'<div class="gallery-card" onclick="openCatalogEditItemModal(\''+item.id+'\')"><div class="gallery-img-wrap"><img src="'+loadItemImage(item.id)+'"></div><div class="gallery-info"><span class="sku-badge" style="font-size:.72rem">'+item.sku+'</span><div class="gallery-desc">'+item.description+'</div>'+(item.catalogNote?'<div class="gallery-note">'+item.catalogNote+'</div>':'')+'<div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-outline btn-xs" style="flex:1" onclick="event.stopPropagation();openCatalogEditItemModal(\''+item.id+'\')">✏️</button><button class="btn btn-danger btn-xs" style="flex:1" onclick="event.stopPropagation();deleteCatalogItem(\''+item.id+'\')">🗑</button></div></div></div>').join('')+'</div>';
+    if(!wi.length){container.innerHTML='<div class="empty-state"><div class="es-icon">🖼️</div><div class="es-title">אין פריטים עם תמונות</div></div>';return;}
+    let ghtml='<div class="catalog-gallery" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">';
+    wi.forEach(item=>{
+      const img=loadItemImage(item.id);
+      ghtml+='<div class="gallery-card">'
+        +'<div class="gallery-img-wrap" onclick="openCatalogEditItemModal(\''+item.id+'\')"><img src="'+img+'"></div>'
+        +'<div class="gallery-info">'
+          +'<span class="sku-badge" style="font-size:.7rem">'+item.sku+'</span>'
+          +'<div class="gallery-desc">'+item.description+'</div>'
+        +'</div>'
+        +'<div class="gallery-card-btns">'
+          +'<button class="gallery-card-btn del" onclick="deleteCatalogItem(\''+item.id+'\')">🗑</button>'
+          +'<button class="gallery-card-btn" onclick="openCatalogEditItemModal(\''+item.id+'\')">✏️</button>'
+        +'</div>'
+      +'</div>';
+    });
+    ghtml+='</div>';
+    container.innerHTML=ghtml;
     return;
   }
-  container.innerHTML='<div class="data-table-wrap"><table class="data-table"><thead><tr><th style="width:70px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th style="width:130px">פעולות</th></tr></thead><tbody>'+
-    filtered.map(item=>'<tr>'+
-      '<td style="text-align:center;vertical-align:middle;">'+(imgThumb(item.id,52)||'<span style="color:#cbd5e1">—</span>')+'</td>'+
-      '<td><span class="sku-badge">'+item.sku+'</span></td>'+
-      '<td><div style="font-weight:600;font-size:.88rem">'+item.description+'</div>'+(item.catalogNote?'<div style="color:var(--text-muted);font-size:.78rem;margin-top:2px">'+item.catalogNote+'</div>':'')+'</td>'+
-      '<td><span class="price-ltr">'+fmtPrice(item.listPrice)+'</span></td>'+
-      '<td>'+
-        '<button class="btn btn-outline btn-sm" onclick="openCatalogEditItemModal(\''+item.id+'\')" style="min-height:40px">✏️ עריכה</button> '+
-        '<button class="btn btn-danger btn-sm" onclick="deleteCatalogItem(\''+item.id+'\')" style="min-height:40px">🗑 מחק</button>'+
-      '</td>'+
-    '</tr>').join('')+
-    '</tbody></table></div>';
+  let thtml='<div class="data-table-wrap"><table class="data-table"><thead><tr>'
+    +'<th style="width:66px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th style="width:76px">פעולות</th>'
+    +'</tr></thead><tbody>';
+  filtered.forEach(item=>{
+    const thumb=imgThumb(item.id,54)||'<span style="color:#cbd5e1;font-size:1.2rem">—</span>';
+    thtml+='<tr>'
+      +'<td style="text-align:center;vertical-align:middle;">'+thumb+'</td>'
+      +'<td><span class="sku-badge">'+item.sku+'</span></td>'
+      +'<td>'
+        +'<div style="font-weight:600;font-size:.88rem">'+item.description+'</div>'
+        +(item.catalogNote?'<div style="color:var(--text-muted);font-size:.78rem;margin-top:2px">'+item.catalogNote+'</div>':'')
+        +'<div class="mobile-price" style="color:#1e3a8a;font-size:.8rem;margin-top:2px;direction:ltr;display:inline-block">'+fmtPrice(item.listPrice)+'</div>'
+      +'</td>'
+      +'<td><span class="price-ltr">'+fmtPrice(item.listPrice)+'</span></td>'
+      +'<td style="vertical-align:top;padding-top:8px">'
+        +'<div style="display:flex;flex-direction:column;gap:4px;align-items:center">'
+          +'<button class="btn btn-outline" onclick="openCatalogEditItemModal(\''+item.id+'\')" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center">✏️</button>'
+          +'<button class="btn btn-danger" onclick="deleteCatalogItem(\''+item.id+'\')" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center">🗑</button>'
+        +'</div>'
+      +'</td>'
+    +'</tr>';
+  });
+  thtml+='</tbody></table></div>';
+  container.innerHTML=thtml;
 }
 
 // ============================================================
