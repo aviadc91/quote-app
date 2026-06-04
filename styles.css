@@ -326,7 +326,7 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
 
 /* ============================================================
-   RESPONSIVE — MOBILE FIRST
+   RESPONSIVE — MOBILE
    ============================================================ */
 @media(max-width:768px){
 
@@ -353,58 +353,80 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
   .search-bar{ max-width:100% }
   .cat-filter-select{ width:100% }
 
-  /* ── Catalog table — card layout instead of table ── */
-  .data-table-wrap{ overflow:hidden }
+  /* ── Catalog TABLE — card layout ── */
+  .data-table-wrap{ overflow:hidden; border-radius:var(--radius-lg) }
   .data-table thead{ display:none }
+  .data-table, .data-table tbody, .data-table tr, .data-table td{ display:block; width:100% }
   .data-table tbody tr{
-    display:flex; flex-direction:column;
-    padding:12px; border-bottom:1px solid var(--border);
-    gap:6px; position:relative
+    display:flex; flex-direction:row; align-items:flex-start;
+    padding:9px 10px; border-bottom:1px solid var(--border); gap:10px
   }
-  .data-table tbody tr td{ 
-    border:none; padding:0; font-size:.88rem 
+  .data-table tbody tr td{ border:none; padding:0 }
+
+  /* thumb cell */
+  .data-table tbody tr td:nth-child(1){
+    width:54px; flex-shrink:0
   }
-  /* Show delete button prominently on mobile */
-  .data-table tbody tr td:last-child{
-    display:flex; gap:6px; margin-top:4px
-  }
-  .data-table tbody tr td:last-child .btn{
-    flex:1; justify-content:center; padding:10px; font-size:.85rem;
-    min-height:44px
+  .data-table tbody tr td:nth-child(1) img{
+    width:54px!important; height:54px!important
   }
 
-  /* ── Gallery — 3 per row on mobile ── */
+  /* sku cell — hide on mobile (shown in body cell) */
+  .data-table tbody tr td:nth-child(2){ display:none }
+
+  /* description cell — takes remaining space */
+  .data-table tbody tr td:nth-child(3){ flex:1; min-width:0 }
+
+  /* price cell — hide, shown in description cell */
+  .data-table tbody tr td:nth-child(4){ display:none }
+
+  /* actions cell — icon buttons stacked */
+  .data-table tbody tr td:nth-child(5){
+    display:flex; flex-direction:column; gap:4px;
+    flex-shrink:0; width:34px
+  }
+  .data-table tbody tr td:nth-child(5) .btn{
+    width:32px; height:32px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.85rem; min-height:unset
+  }
+
+  /* ── Gallery — 3 per row ── */
   .catalog-gallery{
     grid-template-columns: repeat(3,1fr) !important;
-    gap:8px
+    gap:6px
   }
-  .gallery-info{ padding:6px 8px }
-  .gallery-desc{ font-size:.72rem }
-  .gallery-price{ font-size:.78rem }
+  .gallery-img-wrap{ aspect-ratio:1; padding:4px }
+  .gallery-info{ padding:4px 6px }
+  .gallery-desc{ font-size:.7rem; line-height:1.25;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+  .gallery-price{ display:none }
+  .gallery-note{ display:none }
+  /* action buttons inside gallery card */
+  .gallery-card-btns{
+    display:flex; border-top:0.5px solid var(--border)
+  }
+  .gallery-card-btn{
+    flex:1; background:none; border:none; padding:6px 0;
+    font-size:.82rem; cursor:pointer; color:var(--text-muted)
+  }
+  .gallery-card-btn.del{ color:var(--danger); border-left:0.5px solid var(--border) }
 
-  /* ── Item card pricing row — single column ── */
-  .item-pricing-row{
-    grid-template-columns:1fr 1fr !important;
-    gap:8px
-  }
+  /* ── Item card pricing row ── */
+  .item-pricing-row{ grid-template-columns:1fr 1fr !important; gap:8px }
   .ipr-field.wide{ grid-column:span 2 }
-  .ipr-field.narrow{ grid-column:span 1 }
   .ipr-field{ width:100%; max-width:100% }
-
-  /* ── Notes row — stack ── */
   .item-notes-row{ grid-template-columns:1fr }
 
   /* ── Group header ── */
-  .group-header{ flex-wrap:wrap; gap:6px; padding:10px 12px }
-  .group-actions{ flex-wrap:wrap; gap:4px }
+  .group-header{ flex-wrap:wrap; gap:6px }
   .group-actions .btn{ padding:6px 10px; font-size:.78rem }
 
   /* ── Totals ── */
   .totals-row{ flex-direction:column }
-  .totals-card{ min-width:unset; width:100% }
-  .notes-card{ min-width:unset; width:100% }
+  .totals-card, .notes-card{ min-width:unset; width:100% }
 
-  /* ── Modal — full screen ── */
+  /* ── Modal — bottom sheet ── */
   .modal-overlay{ padding:0; align-items:flex-end }
   .modal{
     border-radius:var(--radius-lg) var(--radius-lg) 0 0;
@@ -419,17 +441,13 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
   .sync-bar{ padding:6px 12px; gap:7px }
   .sync-btn{ padding:5px 10px }
 
-  /* ── Touch targets — min 44px ── */
-  .btn, .nav-tab, .sync-btn, .vt-btn{
-    min-height:40px; display:inline-flex; align-items:center; justify-content:center
-  }
-
-  /* ── Picker ── */
-  .group-picker-grid{ grid-template-columns:repeat(2,1fr) }
+  /* ── Prevent horizontal scroll ── */
+  body{ overflow-x:hidden }
+  #main-app{ max-width:100vw; overflow-x:hidden }
+  .screen{ max-width:100% }
 }
 
 @media(max-width:380px){
-  /* Very small screens */
   .catalog-gallery{ grid-template-columns:repeat(2,1fr) !important }
   .item-pricing-row{ grid-template-columns:1fr !important }
   .ipr-field.wide{ grid-column:span 1 }
@@ -493,3 +511,27 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 .sync-btn{background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.15);color:inherit;font-family:inherit;font-size:.76rem;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;white-space:nowrap}
 .sync-btn:hover{opacity:.75}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* mobile-price: shown only on mobile (hidden on desktop) */
+.mobile-price { display: none }
+@media(max-width:768px){
+  .mobile-price { display: inline-block }
+  /* hide desktop price col */
+  .data-table td:nth-child(4),
+  .data-table th:nth-child(4) { display: none }
+}
+
+/* gallery card action buttons */
+.gallery-card-btns {
+  display: flex;
+  border-top: 0.5px solid var(--border);
+}
+.gallery-card-btn {
+  flex: 1; background: none; border: none;
+  padding: 7px 0; font-size: .85rem; cursor: pointer;
+  color: var(--text-muted);
+}
+.gallery-card-btn.del {
+  color: var(--danger);
+  border-left: 0.5px solid var(--border);
+}
