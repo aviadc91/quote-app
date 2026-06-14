@@ -199,6 +199,7 @@ let pickerCtx    = { targetGroupId:null, selGroupId:null, selSubgroupId:null, se
 let dragState    = null;
 let catalogView  = 'table';
 let catalogFilter= '';
+const selectedItems = new Set(); // סימון פריטים — נשמר בין חיפושים
 
 // ============================================================
 //  סיסמת מאגר
@@ -786,17 +787,25 @@ function renderCatalogTable() {
 
   // Table — rows clickable on mobile, inline buttons on desktop
   let thtml='<div class="data-table-wrap"><table class="data-table catalog-table"><thead><tr>'
+    +'<th style="width:32px"><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" title="סמן הכל"></th>'
     +'<th style="width:62px">תמונה</th><th>מק"ט</th><th>תיאור</th><th>מחיר</th><th class="desktop-only" style="width:76px">פעולות</th>'
     +'</tr></thead><tbody>';
   filtered.forEach(item=>{
     const thumb=imgThumb(item.id,52)||'<span style="color:#cbd5e1;font-size:1.2rem">—</span>';
-    thtml+='<tr class="catalog-row" onclick="openItemDetailModal(\''+item.id+'\')" style="cursor:pointer">'
-      +'<td style="text-align:center;vertical-align:middle;">'+thumb+'</td>'
-      +'<td><span class="sku-badge">'+item.sku+'</span></td>'
-      +'<td>'
+    const checked=selectedItems.has(item.id)?'checked':'';
+    const selClass=selectedItems.has(item.id)?' row-selected':'';
+    thtml+='<tr class="catalog-row'+selClass+'">'
+      +'<td onclick="event.stopPropagation()" style="text-align:center;vertical-align:middle">'
+        +'<input type="checkbox" class="item-cb" '+checked+' onchange="toggleItemSelect(\''+item.id+'\',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#1e3a8a">'
+      +'</td>'
+      +'<td style="text-align:center;vertical-align:middle;cursor:pointer" onclick="openItemDetailModal(\''+item.id+'\')">'+thumb+'</td>'
+      +'<td style="cursor:pointer" onclick="openItemDetailModal(\''+item.id+'\')"><span class="sku-badge">'+item.sku+'</span></td>'
+      +'<td style="cursor:pointer" onclick="openItemDetailModal(\''+item.id+'\')">'
         +'<div style="font-weight:600;font-size:.88rem">'+item.description+'</div>'
         +(item.catalogNote?'<div style="color:var(--text-muted);font-size:.78rem;margin-top:2px">'+item.catalogNote+'</div>':'')
         +'<div class="mobile-price" style="color:#1e3a8a;font-size:.8rem;margin-top:3px;direction:ltr;display:inline-block">'+fmtPrice(item.listPrice)+'</div>'
+      +'</td>'
+      +'<td style="cursor:pointer" onclick="openItemDetailModal(\''+item.id+'\')"><span class="price-ltr">'+fmtPrice(item.listPrice)+'</span></td>'
       +'<td class="desktop-only" style="vertical-align:middle" onclick="event.stopPropagation()">'
         +'<div style="display:flex;flex-direction:column;gap:4px;align-items:center">'
           +'<button class="btn btn-outline" onclick="openCatalogEditItemModal(\''+item.id+'\')" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center">✏️</button>'
@@ -807,7 +816,19 @@ function renderCatalogTable() {
   });
   thtml+='</tbody></table></div>';
   container.innerHTML=thtml;
+  _updateSelectionBar();
+  // update select-all checkbox state
+  const allCb=document.getElementById('select-all-cb');
+  if(allCb) allCb.checked=filtered.length>0&&filtered.every(i=>selectedItems.has(i.id));
 }
+
+function toggleSelectAll(checked){
+  const q=(document.getElementById('catalog-search')?.value||'').toLowerCase();
+  state.catalog.filter(i=>!q||i.sku.toLowerCase().includes(q)||i.description.toLowerCase().includes(q))
+    .forEach(i=>{ if(checked) selectedItems.add(i.id); else selectedItems.delete(i.id); });
+  renderCatalogTable();
+}
+
 
 // ── Shared item detail modal (table + gallery) ───────────────
 function openItemDetailModal(id) {
@@ -928,7 +949,71 @@ function _deleteCatalogItem(id) {
 }
 
 // Excel catalog export/import
-function exportCatalogToExcel(){
+// ── Item selection ────────────────────────────────────────────
+function toggleItemSelect(id, checked) {
+  if (checked) selectedItems.add(id);
+  else         selectedItems.delete(id);
+  _updateSelectionBar();
+}
+
+function clearSelection() {
+  selectedItems.clear();
+  _updateSelectionBar();
+  renderCatalogTable();
+}
+
+function _updateSelectionBar() {
+  const bar   = document.getElementById('selection-bar');
+  const count = document.getElementById('selection-count');
+  if (!bar) return;
+  if (selectedItems.size === 0) {
+    bar.classList.add('hidden');
+  } else {
+    bar.classList.remove('hidden');
+    count.textContent = `${selectedItems.size} פריטים מסומנים`;
+  }
+}
+
+function copySelectedToClipboard() {
+  if (!selectedItems.size) return showToast('לא נבחרו פריטים','warning');
+  const lines = [...selectedItems].map(id => {
+    const item = state.catalog.find(i => i.id === id);
+    if (!item) return null;
+    return `${item.sku} - ${item.description} - ${fmtPrice(item.listPrice)}`;
+  }).filter(Boolean);
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text)
+    .then(()=>showToast(`✅ ${lines.length} פריטים הועתקו`,'success'))
+    .catch(()=>{
+      // fallback for older browsers
+      const ta=document.createElement('textarea');
+      ta.value=text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast(`✅ ${lines.length} פריטים הועתקו`,'success');
+    });
+}
+
+
+function _loadScript(url) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${url}"]`)) return res();
+    const s = document.createElement('script');
+    s.src = url; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+async function _requireXLSX() {
+  if (typeof XLSX === 'undefined')
+    await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+}
+async function _requirePDF() {
+  if (typeof html2pdf === 'undefined')
+    await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+}
+
+function exportCatalogToExcel(){ _requireXLSX().then(_doExportCatalogToExcel); }
+function _doExportCatalogToExcel(){
   // כותרות — כל השדות
   const headers=['מק"ט','תיאור','מחיר מחירון','הערת מוצר','שסתומי ESVF מתאימים','קטגוריה (groupId)','תת-קטגוריה (subgroupId)'];
   const rows=[
@@ -964,7 +1049,8 @@ function exportCatalogToExcel(){
   showToast('✅ יוצא — '+state.catalog.length+' פריטים','success');
 }
 
-function importCatalogFromExcel(event){
+function importCatalogFromExcel(event){ _requireXLSX().then(()=>_doImportCatalog(event)); }
+function _doImportCatalog(event){
   const file=event.target.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=e=>{
@@ -1327,7 +1413,8 @@ function renderExtraHTML(gid,iid,extra){ return ''; } // extras removed
 // ============================================================
 //  PDF EXPORT — עיצוב טבלאי פשוט
 // ============================================================
-function exportPDF(){
+function exportPDF(){ _requirePDF().then(_doExportPDF); }
+async function _doExportPDF(){
   if(!state.quote||!state.quote.groups.length)return showToast('ההצעה ריקה','warning');
   const date=todayStr(),proj=state.quote.projectName||'—',emp=state.quote.employeeName||'—';
 
@@ -1446,7 +1533,8 @@ function exportPDF(){
 // ============================================================
 //  EXCEL EXPORT — כל השדות
 // ============================================================
-function exportExcel(){
+function exportExcel(){ _requireXLSX().then(_doExportExcel); }
+function _doExportExcel(){
   if(!state.quote||!state.quote.groups.length)return showToast('ההצעה ריקה','warning');
   const grand=calcGrandTotal(),final=calcFinalTotal();
   const disc=fmtNum(state.quote.globalDiscountPct);
