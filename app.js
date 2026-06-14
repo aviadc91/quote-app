@@ -265,7 +265,7 @@ function saveCatalog() {
       });
       _setSyncBar('ok','מחובר לענן ✓');
     } catch(e){ _setSyncBar('error','שגיאת שמירה — נסה שוב'); console.error(e); }
-  }, 800);
+  }, 300);
 }
 
 function saveQuote() {
@@ -279,7 +279,7 @@ function saveQuote() {
         ...state.quote, updatedAt: new Date().toISOString()
       });
     } catch(e){ console.error(e); }
-  }, 800);
+  }, 300);
 }
 
 // שמירה מיידית לענן (ללא debounce) — לשימוש בייבוא גיבוי
@@ -1412,14 +1412,25 @@ document.addEventListener('paste', e => {
 // ============================================================
 window.addEventListener('DOMContentLoaded', boot);
 
-// נקה localStorage בסגירת הדפדפן אם Firebase מחובר — אין צורך בנתונים מקומיים
-window.addEventListener('unload', () => {
-  if (db) {
-    try {
-      const keys = Object.keys(localStorage).filter(k =>
-        k.startsWith('pq_catalog') || k.startsWith('pq_quote') || k.startsWith('pq_img_')
-      );
-      keys.forEach(k => localStorage.removeItem(k));
-    } catch(e) {}
+// שמור מיידית כשהמשתמש עוזב את הדף (מסתיר, מחליף טאב, סוגר)
+// visibilitychange הוא אמין יותר מ-beforeunload ומאפשר async
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && db) {
+    // ביטול timer ושמירה מיידית
+    clearTimeout(_catalogTimer);
+    clearTimeout(_quoteTimer);
+    _writeNow();
   }
 });
+
+async function _writeNow() {
+  if (!db) return;
+  try {
+    const images = {};
+    state.catalog.forEach(i => { if (imageCache[i.id]) images[i.id] = imageCache[i.id]; });
+    await Promise.all([
+      db.collection('data').doc('catalog').set({ items: state.catalog, updatedAt: new Date().toISOString() }),
+      db.collection('data').doc('quote').set({ ...state.quote, updatedAt: new Date().toISOString() })
+    ]);
+  } catch(e) { console.warn('_writeNow:', e); }
+}
