@@ -518,31 +518,33 @@ async function restoreCloudBackup(docId, label) {
 
 
 async function boot() {
-  // 1. Check config
-  const configFilled = typeof FIREBASE_CONFIG!=='undefined'
+  // הצג את האפליקציה מיד — אל תחכה לשום דבר
+  document.getElementById('main-app').classList.remove('hidden');
+  document.getElementById('sync-bar').classList.remove('hidden');
+  _setSyncBar('saving', 'מתחבר...');
+
+  // 1. טען מ-localStorage מיידית
+  _loadFromLocalStorage();
+  renderCatalogTable(); renderQuote(); updateUndoRedoBtn();
+
+  // 2. בדוק config
+  const configFilled = typeof FIREBASE_CONFIG !== 'undefined'
     && FIREBASE_CONFIG.apiKey !== 'REPLACE_ME'
     && FIREBASE_CONFIG.projectId !== 'REPLACE_ME';
 
   if (!configFilled) {
+    document.getElementById('main-app').classList.add('hidden');
+    document.getElementById('sync-bar').classList.add('hidden');
     document.getElementById('setup-screen').classList.remove('hidden');
     return;
   }
 
-  // 2. Init Firebase
+  // 3. חבר Firebase
   try {
-    firebase.initializeApp(FIREBASE_CONFIG);
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
-    // Enable offline persistence
     await db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
   } catch(e) { console.warn('Firebase init:', e); }
-
-  // 3. Load from localStorage first (instant render)
-  _loadFromLocalStorage();
-  renderCatalogTable(); renderQuote(); updateUndoRedoBtn();
-
-  // 4. Load from Firestore (may update display)
-  document.getElementById('sync-bar').classList.remove('hidden');
-  document.getElementById('main-app').classList.remove('hidden');
   _setSyncBar('saving', 'מתחבר...');
 
   try {
