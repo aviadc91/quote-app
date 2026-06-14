@@ -300,22 +300,76 @@ async function forceSaveAll() {
   }
 }
 
-function saveItemImage(itemId, dataUrl) {
-  imageCache[itemId] = dataUrl;
-  try { localStorage.setItem('pq_img_'+itemId, dataUrl); } catch(e){}
+// ── Image compression ────────────────────────────────────────
+function compressImage(dataUrl, maxPx=600, quality=0.8) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      let w=img.width, h=img.height;
+      if (w>maxPx||h>maxPx) {
+        if (w>h) { h=Math.round(h*maxPx/w); w=maxPx; }
+        else      { w=Math.round(w*maxPx/h); h=maxPx; }
+      }
+      const c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => res(dataUrl); // fallback
+    img.src = dataUrl;
+  });
+}
+
+// ── Image storage ─────────────────────────────────────────────
+async function saveItemImage(itemId, dataUrl) {
+  // דחוס לפני שמירה
+  const compressed = await compressImage(dataUrl);
+  imageCache[itemId] = compressed;
+  try { localStorage.setItem('pq_img_'+itemId, compressed); } catch(e){}
+  // שמור ל-Firestore (אחרי דחיסה הגודל סביר)
   if (db) {
-    db.collection('images').doc(itemId).set({ data: dataUrl, updatedAt: new Date().toISOString() })
-      .catch(e=>console.warn('img save:',e));
+    db.collection('images').doc(itemId)
+      .set({ data: compressed, updatedAt: new Date().toISOString() })
+      .catch(e=>console.warn('img save:', e));
   }
   return true;
 }
-
-function loadItemImage(itemId) { return imageCache[itemId]||null; }
 
 function deleteItemImage(itemId) {
   delete imageCache[itemId];
   localStorage.removeItem('pq_img_'+itemId);
   if (db) db.collection('images').doc(itemId).delete().catch(()=>{});
+}
+
+// טעינת תמונות ברקע (lazy) — רק אחרי שהאפליקציה נטענה
+async function _loadImagesLazy() {
+  if (!db) return;
+  // קודם נטען מ-localStorage (מיידי)
+  state.catalog.forEach(i=>{
+    if (!imageCache[i.id]) {
+      const img=localStorage.getItem('pq_img_'+i.id);
+      if (img) imageCache[i.id]=img;
+    }
+  });
+  // אחר כך משלים מ-Firestore רק מה שחסר
+  const missing = state.catalog.filter(i=>!imageCache[i.id]).map(i=>i.id);
+  if (!missing.length) return;
+  try {
+    // טען עד 10 תמונות חסרות בכל פעם
+    for (let i=0; i<missing.length; i+=10) {
+      const batch = missing.slice(i, i+10);
+      await Promise.all(batch.map(async id => {
+        try {
+          const doc = await db.collection('images').doc(id).get();
+          if (doc.exists && doc.data().data) {
+            imageCache[id] = doc.data().data;
+            try { localStorage.setItem('pq_img_'+id, doc.data().data); } catch(e){}
+          }
+        } catch(e) {}
+      }));
+    }
+    renderCatalogTable();
+  } catch(e) { console.warn('lazy img load:', e); }
 }
 
 function imgThumb(itemId, size=56) {
@@ -341,36 +395,27 @@ function importFullBackup(event) {
       const data=JSON.parse(e.target.result);
       if(!data.catalog) return showToast('קובץ לא תקין','error');
       const imgCount=Object.keys(data.images||{}).length;
-      if(!confirm(`לטעון ${data.catalog.length} פריטים ו-${imgCount} תמונות?\nהפעולה תיקח כמה שניות.`)) return;
+      if(!confirm(`לטעון ${data.catalog.length} פריטים ו-${imgCount} תמונות?`)) return;
 
-      _setSyncBar('saving',`טוען נתונים ל-Firebase...`);
+      _setSyncBar('saving','טוען נתונים...');
 
-      // טען לזיכרון
       state.catalog=data.catalog; state.catalog.forEach(i=>{if(!i.id)i.id=uid();});
       if(data.quote){state.quote=data.quote;normalizeQuote(state.quote);}
       else createNewQuote(true);
 
-      // שמור תמונות לcache + Firebase — המתן לכולן
+      // תמונות → דחוס ושמור (localStorage + Firestore)
       const entries=Object.entries(data.images||{});
-      let done=0;
+      _setSyncBar('saving',`שומר ${entries.length} תמונות...`);
       for(const [id,url] of entries){
-        imageCache[id]=url;
-        try { localStorage.setItem('pq_img_'+id,url); }catch(e){}
-        if(db){
-          try {
-            await db.collection('images').doc(id).set({data:url,updatedAt:new Date().toISOString()});
-          }catch(e){ console.warn('img save:',e); }
-        }
-        done++;
-        if(done%5===0) _setSyncBar('saving',`שומר תמונות... ${done}/${entries.length}`);
+        await saveItemImage(id, url); // compresses + saves
       }
 
-      // שמור קטלוג ו-quote
+      // קטלוג + הצעה → Firebase
       await forceSaveAll();
 
       renderCatalogTable(); renderQuote();
-      showToast(`✅ ${data.catalog.length} פריטים ו-${done} תמונות נשמרו ב-Firebase`,'success');
-    } catch(ex){ showToast('שגיאה: '+ex.message,'error'); _setSyncBar('error','שגיאת שמירה'); }
+      showToast(`✅ ${data.catalog.length} פריטים נטענו`,'success');
+    } catch(ex){ showToast('שגיאה: '+ex.message,'error'); _setSyncBar('error','שגיאה'); }
   };
   reader.readAsText(file,'utf-8'); event.target.value='';
 }
@@ -382,27 +427,22 @@ async function createCloudBackup() {
   if (!db) return showToast('לא מחובר ל-Firebase','error');
   _setSyncBar('saving','שומר גרסה...');
   try {
-    const images = {};
-    state.catalog.forEach(i => { if (imageCache[i.id]) images[i.id] = imageCache[i.id]; });
-    const now = new Date();
+    const now  = new Date();
     const key  = 'backup_' + now.toISOString().replace(/[:.]/g,'-');
     const label= now.toLocaleDateString('he-IL') + ' ' + now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
 
+    // שמור קטלוג + הצעה בלבד — תמונות כבדות לא נכנסות ל-Firestore
     await db.collection('backups').doc(key).set({
-      savedAt: now.toISOString(),
+      savedAt:    now.toISOString(),
       label,
-      itemCount: state.catalog.length,
-      imageCount: Object.keys(images).length,
-      catalog: state.catalog,
-      quote: state.quote,
-      images
+      itemCount:  state.catalog.length,
+      catalog:    state.catalog,
+      quote:      state.quote
     });
 
-    // מחק גרסאות ישנות מעל 10
     await _pruneOldBackups();
-
     _setSyncBar('ok','מחובר לענן ✓');
-    showToast(`✅ גרסה נשמרה: ${label}`,'success');
+    showToast(`✅ גרסה נשמרה: ${label} (${state.catalog.length} פריטים)`,'success');
   } catch(e) {
     _setSyncBar('error','שגיאת שמירה');
     showToast('שגיאה: ' + e.message,'error');
@@ -453,7 +493,7 @@ async function openCloudBackupsList() {
 }
 
 async function restoreCloudBackup(docId, label) {
-  if (!confirm(`לשחזר את הגרסה "${label}"?\nהנתונים הנוכחיים יוחלפו.`)) return;
+  if (!confirm(`לשחזר את הגרסה "${label}"?\nהנתונים הנוכחיים יוחלפו.\n(תמונות לא משוחזרות מהענן — נשמרות רק מקומית)`)) return;
   closeModal();
   _setSyncBar('saving','משחזר...');
   try {
@@ -465,12 +505,6 @@ async function restoreCloudBackup(docId, label) {
     state.catalog.forEach(i => { if(!i.id) i.id = uid(); });
     if (data.quote) { state.quote = data.quote; normalizeQuote(state.quote); }
     else createNewQuote(true);
-
-    // תמונות
-    Object.entries(data.images || {}).forEach(([id,url]) => {
-      imageCache[id] = url;
-      try { localStorage.setItem('pq_img_'+id, url); } catch(e) {}
-    });
 
     await forceSaveAll();
     renderCatalogTable(); renderQuote();
@@ -532,31 +566,20 @@ async function boot() {
       createNewQuote(true);
     }
 
-    // Images — load in background, don't block
-    _loadImagesFromFirestore().then(()=>renderCatalogTable()).catch(()=>{});
+    // תמונות — נטענות מ-localStorage מיידית
+    state.catalog.forEach(i=>{
+      const img=localStorage.getItem('pq_img_'+i.id);
+      if(img) imageCache[i.id]=img;
+    });
 
     _setSyncBar('ok', 'מחובר לענן ✓');
     renderCatalogTable(); renderQuote();
+    // תמונות חסרות — טען מ-Firestore ברקע
+    setTimeout(()=>_loadImagesLazy(), 800);
   } catch(e) {
     _setSyncBar('error', 'לא ניתן להתחבר — עובד במצב מקומי');
     console.warn('Firestore load:', e);
   }
-}
-
-async function _loadImagesFromFirestore() {
-  if (!db) return;
-  try {
-    const snap = await db.collection('images').get();
-    snap.forEach(doc => {
-      const data = doc.data().data;
-      if (data) {
-        imageCache[doc.id] = data;
-        try { localStorage.setItem('pq_img_'+doc.id, data); } catch(e){}
-      }
-    });
-    // Re-render catalog to show newly loaded images
-    renderCatalogTable();
-  } catch(e) { console.warn('load images:', e); }
 }
 
 function _loadFromLocalStorage() {
