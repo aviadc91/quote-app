@@ -340,20 +340,148 @@ function importFullBackup(event) {
     try {
       const data=JSON.parse(e.target.result);
       if(!data.catalog) return showToast('קובץ לא תקין','error');
-      if(!confirm(`לטעון ${data.catalog.length} פריטים ו-${Object.keys(data.images||{}).length} תמונות?`)) return;
+      const imgCount=Object.keys(data.images||{}).length;
+      if(!confirm(`לטעון ${data.catalog.length} פריטים ו-${imgCount} תמונות?\nהפעולה תיקח כמה שניות.`)) return;
+
+      _setSyncBar('saving',`טוען נתונים ל-Firebase...`);
+
+      // טען לזיכרון
       state.catalog=data.catalog; state.catalog.forEach(i=>{if(!i.id)i.id=uid();});
       if(data.quote){state.quote=data.quote;normalizeQuote(state.quote);}
       else createNewQuote(true);
-      Object.entries(data.images||{}).forEach(([id,url])=>saveItemImage(id,url));
+
+      // שמור תמונות לcache + Firebase — המתן לכולן
+      const entries=Object.entries(data.images||{});
+      let done=0;
+      for(const [id,url] of entries){
+        imageCache[id]=url;
+        try { localStorage.setItem('pq_img_'+id,url); }catch(e){}
+        if(db){
+          try {
+            await db.collection('images').doc(id).set({data:url,updatedAt:new Date().toISOString()});
+          }catch(e){ console.warn('img save:',e); }
+        }
+        done++;
+        if(done%5===0) _setSyncBar('saving',`שומר תמונות... ${done}/${entries.length}`);
+      }
+
+      // שמור קטלוג ו-quote
       await forceSaveAll();
+
       renderCatalogTable(); renderQuote();
-      showToast(`✅ ${data.catalog.length} פריטים נטענו`,'success');
-    } catch(ex){showToast('שגיאה: '+ex.message,'error');}
+      showToast(`✅ ${data.catalog.length} פריטים ו-${done} תמונות נשמרו ב-Firebase`,'success');
+    } catch(ex){ showToast('שגיאה: '+ex.message,'error'); _setSyncBar('error','שגיאת שמירה'); }
   };
   reader.readAsText(file,'utf-8'); event.target.value='';
 }
 
-// ── Boot ──────────────────────────────────────────────────────
+// ── Cloud versioned backups ───────────────────────────────────
+const MAX_CLOUD_BACKUPS = 10;
+
+async function createCloudBackup() {
+  if (!db) return showToast('לא מחובר ל-Firebase','error');
+  _setSyncBar('saving','שומר גרסה...');
+  try {
+    const images = {};
+    state.catalog.forEach(i => { if (imageCache[i.id]) images[i.id] = imageCache[i.id]; });
+    const now = new Date();
+    const key  = 'backup_' + now.toISOString().replace(/[:.]/g,'-');
+    const label= now.toLocaleDateString('he-IL') + ' ' + now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+
+    await db.collection('backups').doc(key).set({
+      savedAt: now.toISOString(),
+      label,
+      itemCount: state.catalog.length,
+      imageCount: Object.keys(images).length,
+      catalog: state.catalog,
+      quote: state.quote,
+      images
+    });
+
+    // מחק גרסאות ישנות מעל 10
+    await _pruneOldBackups();
+
+    _setSyncBar('ok','מחובר לענן ✓');
+    showToast(`✅ גרסה נשמרה: ${label}`,'success');
+  } catch(e) {
+    _setSyncBar('error','שגיאת שמירה');
+    showToast('שגיאה: ' + e.message,'error');
+  }
+}
+
+async function _pruneOldBackups() {
+  if (!db) return;
+  try {
+    const snap = await db.collection('backups').orderBy('savedAt','desc').get();
+    const docs  = snap.docs;
+    if (docs.length > MAX_CLOUD_BACKUPS) {
+      const toDelete = docs.slice(MAX_CLOUD_BACKUPS);
+      await Promise.all(toDelete.map(d => d.ref.delete()));
+    }
+  } catch(e) { console.warn('prune:', e); }
+}
+
+async function openCloudBackupsList() {
+  if (!db) return showToast('לא מחובר ל-Firebase','error');
+  openModal('📋 גרסאות שמורות בענן', '<div style="text-align:center;padding:20px;color:var(--text-muted)">טוען...</div>');
+  try {
+    const snap = await db.collection('backups').orderBy('savedAt','desc').limit(10).get();
+    if (snap.empty) {
+      document.getElementById('modal-body').innerHTML =
+        '<div style="text-align:center;padding:20px;color:var(--text-muted)">אין גרסאות שמורות.<br>לחץ "☁️ שמור גרסה" כדי ליצור אחת.</div>';
+      return;
+    }
+    const rows = snap.docs.map(doc => {
+      const d = doc.data();
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border);gap:10px">
+        <div>
+          <div style="font-weight:600;font-size:.9rem">${esc(d.label||d.savedAt)}</div>
+          <div style="font-size:.78rem;color:var(--text-muted)">${d.itemCount||0} פריטים, ${d.imageCount||0} תמונות</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="restoreCloudBackup('${doc.id}','${esc(d.label||'')}')">שחזר</button>
+      </div>`;
+    }).join('');
+    document.getElementById('modal-body').innerHTML =
+      `<div style="margin-bottom:12px;font-size:.85rem;color:var(--text-muted)">שחזור יחליף את הנתונים הנוכחיים.</div>
+       ${rows}
+       <div class="modal-actions" style="margin-top:14px">
+         <button class="btn btn-outline" onclick="closeModal()">סגור</button>
+       </div>`;
+  } catch(e) {
+    document.getElementById('modal-body').innerHTML = `<div style="color:var(--danger)">שגיאה: ${e.message}</div>`;
+  }
+}
+
+async function restoreCloudBackup(docId, label) {
+  if (!confirm(`לשחזר את הגרסה "${label}"?\nהנתונים הנוכחיים יוחלפו.`)) return;
+  closeModal();
+  _setSyncBar('saving','משחזר...');
+  try {
+    const doc = await db.collection('backups').doc(docId).get();
+    if (!doc.exists) return showToast('הגרסה לא נמצאה','error');
+    const data = doc.data();
+
+    state.catalog = data.catalog || [];
+    state.catalog.forEach(i => { if(!i.id) i.id = uid(); });
+    if (data.quote) { state.quote = data.quote; normalizeQuote(state.quote); }
+    else createNewQuote(true);
+
+    // תמונות
+    Object.entries(data.images || {}).forEach(([id,url]) => {
+      imageCache[id] = url;
+      try { localStorage.setItem('pq_img_'+id, url); } catch(e) {}
+    });
+
+    await forceSaveAll();
+    renderCatalogTable(); renderQuote();
+    showToast(`✅ שוחזרה גרסה: ${label}`,'success');
+  } catch(e) {
+    _setSyncBar('error','שגיאת שחזור');
+    showToast('שגיאה: '+e.message,'error');
+  }
+}
+
+
 async function boot() {
   // 1. Check config
   const configFilled = typeof FIREBASE_CONFIG!=='undefined'
@@ -404,8 +532,8 @@ async function boot() {
       createNewQuote(true);
     }
 
-    // Images — load in background
-    _loadImagesFromFirestore();
+    // Images — load in background, don't block
+    _loadImagesFromFirestore().then(()=>renderCatalogTable()).catch(()=>{});
 
     _setSyncBar('ok', 'מחובר לענן ✓');
     renderCatalogTable(); renderQuote();
