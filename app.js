@@ -518,49 +518,51 @@ async function restoreCloudBackup(docId, label) {
 
 
 async function boot() {
-  // הצג את האפליקציה מיד — אל תחכה לשום דבר
-  document.getElementById('main-app').classList.remove('hidden');
-  document.getElementById('sync-bar').classList.remove('hidden');
   _setSyncBar('saving', 'מתחבר...');
 
-  // 1. טען מ-localStorage מיידית
+  // טען מ-localStorage מיידית
   _loadFromLocalStorage();
   renderCatalogTable(); renderQuote(); updateUndoRedoBtn();
 
-  // 2. בדוק config
+  // בדוק config
   const configFilled = typeof FIREBASE_CONFIG !== 'undefined'
     && FIREBASE_CONFIG.apiKey !== 'REPLACE_ME'
     && FIREBASE_CONFIG.projectId !== 'REPLACE_ME';
 
   if (!configFilled) {
+    document.getElementById('setup-screen').classList.remove('hidden');
     document.getElementById('main-app').classList.add('hidden');
     document.getElementById('sync-bar').classList.add('hidden');
-    document.getElementById('setup-screen').classList.remove('hidden');
     return;
   }
 
-  // 3. חבר Firebase
+  // חבר Firebase
   try {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
     await db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
   } catch(e) { console.warn('Firebase init:', e); }
-  _setSyncBar('saving', 'מתחבר...');
 
+  // טען מ-Firestore עם timeout של 6 שניות
   try {
-    // Catalog
-    const catDoc = await db.collection('data').doc('catalog').get();
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000));
+
+    const [catDoc, qDoc] = await Promise.race([
+      Promise.all([
+        db.collection('data').doc('catalog').get(),
+        db.collection('data').doc('quote').get()
+      ]),
+      timeout
+    ]);
+
     if (catDoc.exists && catDoc.data().items?.length) {
       state.catalog = catDoc.data().items;
       state.catalog.forEach(i=>{if(!i.id)i.id=uid();});
       try { localStorage.setItem('pq_catalog', JSON.stringify(state.catalog)); } catch(e){}
     } else if (!state.catalog.length) {
       state.catalog = [...DEFAULT_CATALOG];
-      saveCatalog();
     }
 
-    // Quote
-    const qDoc = await db.collection('data').doc('quote').get();
     if (qDoc.exists && qDoc.data().groups) {
       const q={...qDoc.data()}; delete q.updatedAt;
       state.quote=q; normalizeQuote(state.quote);
@@ -569,19 +571,22 @@ async function boot() {
       createNewQuote(true);
     }
 
-    // תמונות — נטענות מ-localStorage מיידית
     state.catalog.forEach(i=>{
       const img=localStorage.getItem('pq_img_'+i.id);
       if(img) imageCache[i.id]=img;
     });
 
-    _setSyncBar('ok', 'מחובר לענן ✓');
+    _setSyncBar('ok','מחובר לענן ✓');
     renderCatalogTable(); renderQuote();
-    // תמונות חסרות — טען מ-Firestore ברקע
-    setTimeout(()=>_loadImagesLazy(), 800);
+    setTimeout(()=>_loadImagesLazy(), 1000);
+
   } catch(e) {
-    _setSyncBar('error', 'לא ניתן להתחבר — עובד במצב מקומי');
-    console.warn('Firestore load:', e);
+    console.warn('Firestore:', e.message);
+    _setSyncBar('error', e.message==='timeout' ? 'פג timeout — עובד מקומית' : 'שגיאת חיבור');
+    // הצג מה שיש בזיכרון
+    if (!state.catalog.length) state.catalog = [...DEFAULT_CATALOG];
+    if (!state.quote) createNewQuote(true);
+    renderCatalogTable(); renderQuote();
   }
 }
 
