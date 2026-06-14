@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>מערכת הצעות מחיר</title>
+  <title>תמחור שירות - אביעד כהן</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -112,6 +110,13 @@
         <button id="cv-gallery" class="vt-btn"        onclick="setCatalogView('gallery')">🖼 גלריה</button>
       </div>
       <div id="catalog-table-container"></div>
+
+      <!-- סרגל סימון — מוצג כשיש פריטים מסומנים -->
+      <div id="selection-bar" class="selection-bar hidden">
+        <span id="selection-count" class="sel-count"></span>
+        <button class="btn btn-success btn-sm" onclick="copySelectedToClipboard()">📋 העתק לClipboard</button>
+        <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕ נקה סימון</button>
+      </div>
     </div>
 
     <div id="screen-quote" class="screen hidden">
@@ -146,11 +151,10 @@
   <input type="file" id="catalog-import-input" accept=".xlsx,.xls" style="display:none" onchange="importCatalogFromExcel(event)">
   <input type="file" id="quote-load-input"     accept=".json"      style="display:none" onchange="loadQuoteFromFile(event)">
 
-  <!-- Firebase SDK (v9 compat) -->
+  <!-- Firebase only — auth removed, app+firestore loaded async -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-
+  <!-- html2pdf and xlsx loaded on demand -->
   <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
