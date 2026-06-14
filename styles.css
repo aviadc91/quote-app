@@ -644,3 +644,10 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 @media(min-width:769px){
   .mobile-price { display: none }
 }
+
+.sync-btn-primary {
+  background: #1e3a8a !important;
+  color: white !important;
+  border-color: #1e3a8a !important;
+}
+.sync-btn-primary:hover { opacity: .85 }
