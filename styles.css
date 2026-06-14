@@ -651,3 +651,21 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
   border-color: #1e3a8a !important;
 }
 .sync-btn-primary:hover { opacity: .85 }
+
+/* === SELECTION BAR === */
+.selection-bar{
+  position:sticky;bottom:16px;
+  background:#1e3a8a;color:white;
+  border-radius:var(--radius-lg);
+  padding:10px 16px;
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 4px 20px rgba(30,58,138,.4);
+  margin-top:12px;flex-wrap:wrap;
+  z-index:100
+}
+.sel-count{flex:1;font-weight:600;font-size:.9rem}
+.selection-bar .btn{flex-shrink:0}
+
+/* selected row highlight */
+.row-selected td{background:#eff6ff !important}
+.row-selected:hover td{background:#dbeafe !important}
