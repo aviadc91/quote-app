@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>תמחור שירות - אביעד כהן</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
 </head>
 <body>
 
@@ -63,7 +65,7 @@
   </div>
 
   <!-- ── SYNC STATUS BAR ── -->
-  <div id="sync-bar" class="sync-bar sync-ok hidden">
+  <div id="sync-bar" class="sync-bar sync-saving">
     <span id="sync-dot" class="sync-dot">●</span>
     <span id="sync-label">מחובר לענן</span>
     <span class="sync-spacer"></span>
@@ -75,7 +77,7 @@
   </div>
 
   <!-- ── MAIN APP ── -->
-  <div id="main-app" class="hidden">
+  <div id="main-app">
     <nav id="main-nav">
       <div class="nav-brand"><span>📋</span> תמחור שירות - אביעד כהן</div>
       <div class="nav-tabs">
