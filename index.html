@@ -69,7 +69,9 @@
     <span id="sync-dot" class="sync-dot">●</span>
     <span id="sync-label">מחובר לענן</span>
     <span class="sync-spacer"></span>
-    <button class="sync-btn" onclick="exportFullBackup()">💾 גיבוי מקומי</button>
+    <button class="sync-btn sync-btn-primary" onclick="createCloudBackup()" title="שמור גרסה לענן עם חותמת זמן">☁️ שמור גרסה</button>
+    <button class="sync-btn" onclick="openCloudBackupsList()" title="הצג גרסאות שמורות">📋 גרסאות</button>
+    <button class="sync-btn" onclick="exportFullBackup()" title="הורד גיבוי מקומי">💾 גיבוי מקומי</button>
     <button class="sync-btn" onclick="triggerImportBackup()">📂 טען גיבוי</button>
     <input type="file" id="import-backup-input" accept=".json" style="display:none" onchange="importFullBackup(event)">
   </div>
