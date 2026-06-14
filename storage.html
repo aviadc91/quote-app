@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ניהול אחסון מקומי</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Calibri',Arial,sans-serif;direction:rtl;background:#f0f4f8;padding:16px;color:#0f172a;font-size:15px}
+h1{color:#1e3a8a;font-size:1.3rem;margin-bottom:4px}
+.subtitle{color:#64748b;font-size:.85rem;margin-bottom:18px}
+.card{background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:12px;border:0.5px solid #e2e8f0}
+.card-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:10px}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid #f1f5f9}
+.stat-row:last-child{border-bottom:none}
+.stat-label{font-size:.88rem;color:#0f172a}
+.stat-value{font-size:.82rem;color:#1e3a8a;font-weight:600}
+.item-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #f1f5f9}
+.item-row:last-child{border-bottom:none}
+.item-key{flex:1;font-size:.82rem;font-family:monospace;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-size{font-size:.78rem;color:#64748b;flex-shrink:0}
+.del-btn{background:none;border:0.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:.78rem;cursor:pointer;flex-shrink:0}
+.del-btn:hover{background:#fee2e2}
+.action-btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:center}
+.btn-danger{background:#dc2626;color:white}
+.btn-outline{background:white;border:1.5px solid #e2e8f0;color:#475569}
+.btn-primary{background:#1e3a8a;color:white}
+.empty{text-align:center;padding:20px;color:#94a3b8;font-size:.88rem}
+.thumb{width:36px;height:36px;object-fit:contain;border-radius:4px;border:0.5px solid #e2e8f0;flex-shrink:0;background:#f8fafc}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:white;padding:8px 20px;border-radius:8px;font-size:.85rem;display:none}
+</style>
+</head>
+<body>
+
+<h1>🗄️ ניהול אחסון מקומי</h1>
+<p class="subtitle">כל הנתונים שנשמרים על המכשיר הזה</p>
+
+<div class="card" id="summary-card">
+  <div class="card-title">סיכום</div>
+  <div id="summary"></div>
+</div>
+
+<div class="card" id="images-card" style="display:none">
+  <div class="card-title">תמונות</div>
+  <div id="images-list"></div>
+</div>
+
+<div class="card" id="data-card" style="display:none">
+  <div class="card-title">נתונים</div>
+  <div id="data-list"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">פעולות</div>
+  <button class="action-btn btn-danger" onclick="deleteAll()">🗑 מחק הכל מהמכשיר</button>
+  <button class="action-btn btn-outline" onclick="scan()">🔄 רענן</button>
+  <button class="action-btn btn-outline" onclick="history.back()">← חזור לאפליקציה</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function fmt(bytes){
+  if(bytes<1024)return bytes+'B';
+  if(bytes<1024*1024)return(bytes/1024).toFixed(1)+'KB';
+  return(bytes/1024/1024).toFixed(1)+'MB';
+}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  setTimeout(()=>t.style.display='none',2000);
+}
+
+function deleteKey(k){
+  localStorage.removeItem(k);
+  toast('נמחק: '+k);
+  scan();
+}
+
+function deleteAll(){
+  if(!confirm('למחוק את כל נתוני האפליקציה מהמכשיר?')) return;
+  Object.keys(localStorage).filter(k=>k.startsWith('pq_')).forEach(k=>localStorage.removeItem(k));
+  toast('✅ כל הנתונים נמחקו');
+  scan();
+}
+
+function scan(){
+  const all={};
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k.startsWith('pq_')) all[k]=localStorage.getItem(k);
+  }
+
+  const keys=Object.keys(all);
+  const catKey   = keys.find(k=>k==='pq_catalog');
+  const quoteKey = keys.find(k=>k==='pq_quote');
+  const imgKeys  = keys.filter(k=>k.startsWith('pq_img_'));
+  const totalBytes = keys.reduce((s,k)=>(s+(all[k]||'').length),0);
+
+  // Summary
+  let cat=[], q=null;
+  try{ cat=JSON.parse(all['pq_catalog']||'[]'); }catch(e){}
+  try{ q=JSON.parse(all['pq_quote']||'null'); }catch(e){}
+  const grps = q?.groups?.length||0;
+  const items= q?.groups?.reduce((s,g)=>s+g.items.length,0)||0;
+
+  document.getElementById('summary').innerHTML = keys.length===0
+    ? '<div class="empty">אין נתונים שמורים על המכשיר הזה</div>'
+    : `<div class="stat-row"><span class="stat-label">סה"כ גודל</span><span class="stat-value">${fmt(totalBytes*2)}</span></div>
+       <div class="stat-row"><span class="stat-label">פריטים בקטלוג</span><span class="stat-value">${cat.length}</span></div>
+       <div class="stat-row"><span class="stat-label">הצעה פעילה</span><span class="stat-value">${grps} קבוצות, ${items} סעיפים</span></div>
+       <div class="stat-row"><span class="stat-label">תמונות שמורות</span><span class="stat-value">${imgKeys.length}</span></div>`;
+
+  // Images
+  const imgCard=document.getElementById('images-card');
+  const imgList=document.getElementById('images-list');
+  if(imgKeys.length){
+    imgCard.style.display='';
+    imgList.innerHTML=imgKeys.map(k=>{
+      const url=all[k];
+      const id=k.replace('pq_img_','');
+      // Find item name
+      const item=cat.find(i=>i.id===id);
+      const label=item?item.sku+' — '+item.description.slice(0,30):id.slice(0,20)+'...';
+      return `<div class="item-row">
+        ${url.startsWith('data:image')?`<img class="thumb" src="${url}">`:'<div class="thumb"></div>'}
+        <div class="item-key" title="${k}">${label}</div>
+        <div class="item-size">${fmt((url||'').length*2)}</div>
+        <button class="del-btn" onclick="deleteKey('${k}')">מחק</button>
+      </div>`;
+    }).join('');
+  } else {
+    imgCard.style.display='none';
+  }
+
+  // Data keys
+  const dataCard=document.getElementById('data-card');
+  const dataList=document.getElementById('data-list');
+  const dataKeys=keys.filter(k=>!k.startsWith('pq_img_'));
+  if(dataKeys.length){
+    dataCard.style.display='';
+    dataList.innerHTML=dataKeys.map(k=>`
+      <div class="item-row">
+        <div class="item-key">${k}</div>
+        <div class="item-size">${fmt((all[k]||'').length*2)}</div>
+        <button class="del-btn" onclick="deleteKey('${k}')">מחק</button>
+      </div>`).join('');
+  } else {
+    dataCard.style.display='none';
+  }
+}
+
+scan();
+</script>
+</body>
+</html>
