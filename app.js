@@ -540,7 +540,6 @@ async function boot() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
-    await db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
   } catch(e) { console.warn('Firebase init:', e); }
 
   // טען מ-Firestore עם timeout של 6 שניות
