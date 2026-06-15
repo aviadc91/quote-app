@@ -72,13 +72,22 @@ function toast(msg){
   setTimeout(()=>t.style.display='none',2000);
 }
 
+const STORAGE_PASSWORD = '123';
+
+function _checkPassword() {
+  const pwd = prompt('הזן סיסמה למחיקה:');
+  return pwd === STORAGE_PASSWORD;
+}
+
 function deleteKey(k){
+  if(!_checkPassword()) { toast('סיסמה שגויה'); return; }
   localStorage.removeItem(k);
   toast('נמחק: '+k);
   scan();
 }
 
 function deleteAll(){
+  if(!_checkPassword()) { toast('סיסמה שגויה'); return; }
   if(!confirm('למחוק את כל נתוני האפליקציה מהמכשיר?')) return;
   Object.keys(localStorage).filter(k=>k.startsWith('pq_')).forEach(k=>localStorage.removeItem(k));
   toast('✅ כל הנתונים נמחקו');
