@@ -669,3 +669,7 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 /* selected row highlight */
 .row-selected td{background:#eff6ff !important}
 .row-selected:hover td{background:#dbeafe !important}
+
+/* gallery card — relative for checkbox positioning */
+.gallery-card{ position:relative }
+.gallery-selected{ outline:2px solid #1e3a8a; outline-offset:-2px }
