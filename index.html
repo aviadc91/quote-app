@@ -69,10 +69,12 @@
     <span id="sync-dot" class="sync-dot">●</span>
     <span id="sync-label">מחובר לענן</span>
     <span class="sync-spacer"></span>
+    <button class="sync-btn sync-btn-primary" onclick="refreshFromCloud()" title="משוך נתונים עדכניים מהענן">🔄 רענן מהענן</button>
     <button class="sync-btn sync-btn-primary" onclick="createCloudBackup()" title="שמור גרסה לענן עם חותמת זמן">☁️ שמור גרסה</button>
     <button class="sync-btn" onclick="openCloudBackupsList()" title="הצג גרסאות שמורות">📋 גרסאות</button>
     <button class="sync-btn" onclick="exportFullBackup()" title="הורד גיבוי מקומי">💾 גיבוי מקומי</button>
     <button class="sync-btn" onclick="triggerImportBackup()">📂 טען גיבוי</button>
+    <button class="sync-btn" onclick="openStoragePage()" title="ניהול אחסון מקומי">🗄️ אחסון</button>
     <input type="file" id="import-backup-input" accept=".json" style="display:none" onchange="importFullBackup(event)">
   </div>
 
@@ -105,6 +107,15 @@
         </div>
         <select id="catalog-cat-filter" class="cat-filter-select" onchange="setCatalogFilter(this.value)">
           <option value="">כל הקטגוריות</option>
+        </select>
+        <select id="catalog-sort" class="cat-filter-select" onchange="setCatalogSort(this.value)">
+          <option value="">מיון: ברירת מחדל</option>
+          <option value="sku-asc">מק"ט (א׳→ת׳)</option>
+          <option value="sku-desc">מק"ט (ת׳→א׳)</option>
+          <option value="desc-asc">תיאור (א׳→ת׳)</option>
+          <option value="desc-desc">תיאור (ת׳→א׳)</option>
+          <option value="price-asc">מחיר (נמוך→גבוה)</option>
+          <option value="price-desc">מחיר (גבוה→נמוך)</option>
         </select>
       </div>
       <div class="view-toggle">
