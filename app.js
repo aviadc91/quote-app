@@ -199,6 +199,7 @@ let pickerCtx    = { targetGroupId:null, selGroupId:null, selSubgroupId:null, se
 let dragState    = null;
 let catalogView  = 'table';
 let catalogFilter= '';
+let catalogSort  = '';
 const selectedItems = new Set(); // סימון פריטים — נשמר בין חיפושים
 
 // ============================================================
@@ -430,7 +431,38 @@ function importFullBackup(event) {
   reader.readAsText(file,'utf-8'); event.target.value='';
 }
 
-// ── Cloud versioned backups ───────────────────────────────────
+function openStoragePage() { window.location.href = 'storage.html'; }
+
+// משיכה מאולצת מהשרת
+async function refreshFromCloud() {
+  if (!db) return showToast('לא מחובר','error');
+  _setSyncBar('saving','מרענן מהענן...');
+  try {
+    const [catDoc, qDoc] = await Promise.all([
+      db.collection('data').doc('catalog').get({source:'server'}),
+      db.collection('data').doc('quote').get({source:'server'})
+    ]);
+    if (catDoc.exists && catDoc.data().items) {
+      state.catalog = catDoc.data().items;
+      state.catalog.forEach(i=>{if(!i.id)i.id=uid();});
+      try { localStorage.setItem('pq_catalog', JSON.stringify(state.catalog)); } catch(e){}
+    }
+    if (qDoc.exists && qDoc.data().groups) {
+      const q={...qDoc.data()}; delete q.updatedAt;
+      state.quote=q; normalizeQuote(state.quote);
+      try { localStorage.setItem('pq_quote', JSON.stringify(state.quote)); } catch(e){}
+    }
+    renderCatalogTable(); renderQuote();
+    await _loadImagesLazy();
+    _setSyncBar('ok','מחובר לענן ✓');
+    showToast(`✅ עודכן: ${state.catalog.length} פריטים`,'success');
+  } catch(e) {
+    _setSyncBar('error','שגיאת רענון');
+    showToast('שגיאה: '+e.message,'error');
+  }
+}
+
+
 const MAX_CLOUD_BACKUPS = 10;
 
 async function createCloudBackup() {
@@ -551,17 +583,27 @@ async function boot() {
     db = firebase.firestore();
   } catch(e) { console.warn('Firebase init:', e); }
 
-  // טען מ-Firestore עם timeout של 6 שניות
+  // טען מ-Firestore עם timeout של 8 שניות — מהשרת, לא מ-cache
   try {
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000));
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
 
-    const [catDoc, qDoc] = await Promise.race([
-      Promise.all([
+    // נסה קודם מהשרת (נתונים עדכניים); אם נכשל — מה-cache המקומי של Firestore
+    let catDoc, qDoc;
+    try {
+      [catDoc, qDoc] = await Promise.race([
+        Promise.all([
+          db.collection('data').doc('catalog').get({source:'server'}),
+          db.collection('data').doc('quote').get({source:'server'})
+        ]),
+        timeout
+      ]);
+    } catch(serverErr) {
+      console.warn('server read failed, trying cache:', serverErr.message);
+      [catDoc, qDoc] = await Promise.all([
         db.collection('data').doc('catalog').get(),
         db.collection('data').doc('quote').get()
-      ]),
-      timeout
-    ]);
+      ]);
+    }
 
     if (catDoc.exists && catDoc.data().items?.length) {
       state.catalog = catDoc.data().items;
@@ -761,6 +803,22 @@ function loadQuoteFromFile(event){
 // ============================================================
 function setCatalogView(v){ catalogView=v; document.getElementById('cv-table')?.classList.toggle('active',v==='table'); document.getElementById('cv-gallery')?.classList.toggle('active',v==='gallery'); renderCatalogTable(); }
 function setCatalogFilter(val){ catalogFilter=val; renderCatalogTable(); }
+function setCatalogSort(val){ catalogSort=val; renderCatalogTable(); }
+
+function _sortCatalog(items){
+  if(!catalogSort) return items;
+  const arr=[...items];
+  const [field,dir]=catalogSort.split('-');
+  const mul=dir==='desc'?-1:1;
+  arr.sort((a,b)=>{
+    let av,bv;
+    if(field==='sku'){ av=(a.sku||'').toLowerCase(); bv=(b.sku||'').toLowerCase(); return av<bv?-mul:av>bv?mul:0; }
+    if(field==='desc'){ av=(a.description||'').toLowerCase(); bv=(b.description||'').toLowerCase(); return av<bv?-mul:av>bv?mul:0; }
+    if(field==='price'){ return (fmtNum(a.listPrice)-fmtNum(b.listPrice))*mul; }
+    return 0;
+  });
+  return arr;
+}
 
 // ============================================================
 //  CATALOG SCREEN
@@ -769,10 +827,10 @@ function renderCatalogTable() {
   const q=(document.getElementById('catalog-search')?.value||'').toLowerCase();
   let filterIds=null;
   if(catalogFilter){const[fgid,fsgid]=catalogFilter.split(':::');const sg=CATALOG_HIERARCHY.find(h=>h.id===fgid)?.subgroups.find(s=>s.id===fsgid);filterIds=new Set(sg?sgItems(sg).map(i=>i.id):[]);}
-  const filtered=state.catalog.filter(i=>{
+  const filtered=_sortCatalog(state.catalog.filter(i=>{
     if(filterIds&&!filterIds.has(i.id))return false;
     return !q||i.sku.toLowerCase().includes(q)||i.description.toLowerCase().includes(q)||(i.catalogNote||'').toLowerCase().includes(q)||(i.esvfSkus||'').toLowerCase().includes(q);
-  });
+  }));
   document.getElementById('catalog-count').textContent=`${state.catalog.length} פריטים במאגר`+(filtered.length<state.catalog.length?` (${filtered.length} תוצאות)`:'');
   // rebuild filter dropdown
   const el=document.getElementById('catalog-cat-filter');
@@ -787,9 +845,14 @@ function renderCatalogTable() {
     let ghtml='<div class="catalog-gallery">';
     wi.forEach(item=>{
       const img=loadItemImage(item.id);
-      ghtml+='<div class="gallery-card" onclick="openGalleryItemModal(\''+item.id+'\')">'
-        +'<div class="gallery-img-wrap"><img src="'+img+'" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
-        +'<div class="gallery-info">'
+      const checked=selectedItems.has(item.id)?'checked':'';
+      const selClass=selectedItems.has(item.id)?' gallery-selected':'';
+      ghtml+='<div class="gallery-card'+selClass+'">'
+        +'<div style="position:absolute;top:6px;right:6px;z-index:2;background:rgba(255,255,255,.9);border-radius:4px;padding:2px" onclick="event.stopPropagation()">'
+          +'<input type="checkbox" class="item-cb" '+checked+' onchange="toggleItemSelect(\''+item.id+'\',this.checked);renderCatalogTable()" style="width:18px;height:18px;cursor:pointer;accent-color:#1e3a8a;display:block">'
+        +'</div>'
+        +'<div class="gallery-img-wrap" onclick="openGalleryItemModal(\''+item.id+'\')"><img src="'+img+'" style="width:100%;height:100%;object-fit:contain;display:block"></div>'
+        +'<div class="gallery-info" onclick="openGalleryItemModal(\''+item.id+'\')">'
           +'<span class="sku-badge" style="font-size:.68rem">'+item.sku+'</span>'
           +'<div class="gallery-desc" style="font-size:.74rem;line-height:1.25;margin-top:2px">'+item.description+'</div>'
         +'</div>'
@@ -797,6 +860,7 @@ function renderCatalogTable() {
     });
     ghtml+='</div>';
     container.innerHTML=ghtml;
+    _updateSelectionBar();
     return;
   }
 
