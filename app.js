@@ -342,6 +342,15 @@ function deleteItemImage(itemId) {
   if (db) db.collection('images').doc(itemId).delete().catch(()=>{});
 }
 
+function loadItemImage(itemId) {
+  if (imageCache[itemId]) return imageCache[itemId];
+  try {
+    const img = localStorage.getItem('pq_img_'+itemId);
+    if (img) { imageCache[itemId] = img; return img; }
+  } catch(e) {}
+  return null;
+}
+
 // טעינת תמונות ברקע (lazy) — רק אחרי שהאפליקציה נטענה
 async function _loadImagesLazy() {
   if (!db) return;
