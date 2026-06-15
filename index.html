@@ -81,23 +81,24 @@
   <!-- ── MAIN APP ── -->
   <div id="main-app">
     <nav id="main-nav">
+      <button id="hamburger-btn" class="hamburger-btn" onclick="toggleNavMenu()">☰</button>
       <div class="nav-brand"><span>📋</span> תמחור שירות - אביעד כהן</div>
-      <div class="nav-tabs">
-        <button class="nav-tab active" id="tab-catalog" onclick="showScreen('catalog')">📦 מאגר פריטים</button>
-        <button class="nav-tab"        id="tab-quote"   onclick="showScreen('quote')">📄 בניית הצעה</button>
+      <div class="nav-tabs" id="nav-tabs">
+        <button class="nav-tab active" id="tab-catalog" onclick="showScreen('catalog');closeNavMenu()">📦 מאגר פריטים</button>
+        <button class="nav-tab"        id="tab-quote"   onclick="showScreen('quote');closeNavMenu()">📄 בניית הצעה</button>
       </div>
     </nav>
 
     <div id="screen-catalog" class="screen">
       <div class="screen-header">
-        <div>
+        <div class="screen-header-title">
           <h1>מאגר פריטים</h1>
           <p class="screen-subtitle" id="catalog-count"></p>
         </div>
         <div class="header-actions">
-          <button class="btn btn-primary" onclick="openCatalogNewItemModal()">+ הוסף פריט</button>
-          <button class="btn btn-excel"   onclick="exportCatalogToExcel()">📊 ייצא לאקסל</button>
-          <button class="btn btn-outline" onclick="triggerCatalogImport()">📥 ייבוא מאקסל</button>
+          <button class="btn btn-primary header-icon-btn" onclick="openCatalogNewItemModal()" title="הוסף פריט"><span class="bi">+</span><span class="bl">הוסף פריט</span></button>
+          <button class="btn btn-excel header-icon-btn"   onclick="exportCatalogToExcel()" title="ייצא לאקסל"><span class="bi">📊</span><span class="bl">ייצא לאקסל</span></button>
+          <button class="btn btn-outline header-icon-btn" onclick="triggerCatalogImport()" title="ייבוא מאקסל"><span class="bi">📥</span><span class="bl">ייבוא מאקסל</span></button>
         </div>
       </div>
       <div class="catalog-filters">
