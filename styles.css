@@ -483,7 +483,7 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 .setup-step a{color:#1d4ed8}
 
 /* === SYNC BAR === */
-.sync-bar{display:flex;align-items:center;gap:10px;padding:7px 20px;font-size:.82rem;font-weight:500;position:sticky;top:0;z-index:210;border-bottom:1.5px solid transparent;flex-wrap:wrap}
+.sync-bar{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:.82rem;font-weight:500;position:sticky;top:0;z-index:210;border-bottom:1.5px solid transparent;flex-wrap:wrap}
 .sync-ok   {background:#f0fdf4;border-color:#86efac;color:#15803d}
 .sync-saving{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
 .sync-error {background:#fef2f2;border-color:#fca5a5;color:#dc2626}
@@ -491,19 +491,38 @@ kbd{display:inline-block;padding:1px 5px;background:#e2e8f0;border:1px solid #cb
 .dot-ok    {color:#15803d}
 .dot-saving{color:#c2410c;animation:pulse .8s infinite}
 .dot-error {color:#dc2626}
-.sync-spacer{flex:1}
-.sync-btn{background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.15);color:inherit;font-family:inherit;font-size:.76rem;font-weight:600;padding:3px 10px;border-radius:4px;cursor:pointer;white-space:nowrap}
+
+/* compact toggle button (top-right) */
+.sync-toggle{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.12);
+  color:inherit;font-family:inherit;font-size:.8rem;font-weight:600;
+  padding:5px 12px;border-radius:6px;cursor:pointer
+}
+.sync-chevron{font-size:.7rem;opacity:.7}
+
+/* expandable panel of action buttons */
+.sync-panel{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.sync-panel.hidden{display:none}
+
+.sync-btn{background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.15);color:inherit;font-family:inherit;font-size:.76rem;font-weight:600;padding:5px 10px;border-radius:4px;cursor:pointer;white-space:nowrap}
 .sync-btn:hover{opacity:.75}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
+/* on mobile: panel drops down as overlay */
+@media(max-width:768px){
+  .sync-panel{
+    position:absolute;top:100%;left:8px;right:8px;
+    background:white;border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18);
+    padding:8px;flex-direction:column;z-index:600;margin-top:4px
+  }
+  .sync-panel .sync-btn{width:100%;text-align:center;padding:11px;font-size:.86rem;background:#f1f5f9;color:#0f172a}
+  .sync-bar{position:relative}
+}
+
 /* mobile-price: shown only on mobile (hidden on desktop) */
 .mobile-price { display: none }
-@media(max-width:768px){
-  .mobile-price { display: inline-block }
-  /* hide desktop price col */
-  .data-table td:nth-child(4),
-  .data-table th:nth-child(4) { display: none }
-}
 
 /* gallery card action buttons */
 .gallery-card-btns {
