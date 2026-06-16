@@ -66,15 +66,19 @@
 
   <!-- ── SYNC STATUS BAR ── -->
   <div id="sync-bar" class="sync-bar sync-saving">
-    <span id="sync-dot" class="sync-dot">●</span>
-    <span id="sync-label">מחובר לענן</span>
-    <span class="sync-spacer"></span>
-    <button class="sync-btn sync-btn-primary" onclick="refreshFromCloud()" title="משוך נתונים עדכניים מהענן">🔄 רענן מהענן</button>
-    <button class="sync-btn sync-btn-primary" onclick="createCloudBackup()" title="שמור גרסה לענן עם חותמת זמן">☁️ שמור גרסה</button>
-    <button class="sync-btn" onclick="openCloudBackupsList()" title="הצג גרסאות שמורות">📋 גרסאות</button>
-    <button class="sync-btn" onclick="exportFullBackup()" title="הורד גיבוי מקומי">💾 גיבוי מקומי</button>
-    <button class="sync-btn" onclick="triggerImportBackup()">📂 טען גיבוי</button>
-    <button class="sync-btn" onclick="openStoragePage()" title="ניהול אחסון מקומי">🗄️ אחסון</button>
+    <button id="sync-toggle" class="sync-toggle" onclick="toggleSyncPanel()">
+      <span id="sync-dot" class="sync-dot">●</span>
+      <span id="sync-label">מחובר</span>
+      <span class="sync-chevron">▾</span>
+    </button>
+    <div id="sync-panel" class="sync-panel hidden">
+      <button class="sync-btn sync-btn-primary" onclick="refreshFromCloud();closeSyncPanel()" title="משוך נתונים עדכניים מהענן">🔄 רענן מהענן</button>
+      <button class="sync-btn sync-btn-primary" onclick="createCloudBackup();closeSyncPanel()" title="שמור גרסה לענן">☁️ שמור גרסה</button>
+      <button class="sync-btn" onclick="openCloudBackupsList();closeSyncPanel()" title="הצג גרסאות">📋 גרסאות</button>
+      <button class="sync-btn" onclick="exportFullBackup();closeSyncPanel()" title="הורד גיבוי">💾 גיבוי מקומי</button>
+      <button class="sync-btn" onclick="triggerImportBackup();closeSyncPanel()">📂 טען גיבוי</button>
+      <button class="sync-btn" onclick="openStoragePage()" title="ניהול אחסון">🗄️ אחסון</button>
+    </div>
     <input type="file" id="import-backup-input" accept=".json" style="display:none" onchange="importFullBackup(event)">
   </div>
 
